@@ -34,5 +34,15 @@ frontend/.env
 .DS_Store
 Thumbs.db
 
+# OpenClaw agent files
+.openclaw/
+AGENTS.md
+SOUL.md
+IDENTITY.md
+USER.md
+TOOLS.md
+HEARTBEAT.md
+MEMORY.md
+
 # Logs
 *.log

@@ -1,7 +1,9 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
+  // Docker: nginx proxies /api/ → backend
+  // Dev: vite proxy /api → localhost:8099
+  baseURL: '/api',
 })
 
 export default api

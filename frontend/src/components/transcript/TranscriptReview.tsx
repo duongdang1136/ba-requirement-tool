@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { meetingsApi, transcriptApi, exportApi } from '../api'
+import { meetingsApi, transcriptApi, exportApi } from '../../api'
 import type { TranscriptSegment, ProcessingStatus } from '../types'
 
 interface Props {
