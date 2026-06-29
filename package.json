@@ -1,0 +1,13 @@
+{
+  "name": "ba-requirement-tool",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "dev": "node scripts/dev.mjs",
+    "build": "npm --prefix frontend run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

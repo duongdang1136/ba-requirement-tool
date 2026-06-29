@@ -1,5 +1,9 @@
 from pydantic_settings import BaseSettings
 from typing import List
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseSettings):
@@ -8,7 +12,7 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite:///./ba_tool.db"
     upload_dir: str = "./uploads"
-    models_dir: str = "./models"
+    models_dir: str = str(REPO_ROOT / "models")
 
     cors_origins: List[str] = ["http://localhost:5173", "http://localhost:3000"]
 
@@ -19,7 +23,7 @@ class Settings(BaseSettings):
     local_llm_url: str = "http://localhost:11434"
 
     # sherpa-onnx model
-    asr_model_dir: str = "./models/asr/sherpa-onnx-whisper-small"
+    asr_model_dir: str = str(REPO_ROOT / "models" / "asr" / "sherpa-onnx-whisper-small")
     asr_language: str = "vi"
 
     # File limits

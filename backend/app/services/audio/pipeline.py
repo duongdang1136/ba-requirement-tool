@@ -137,7 +137,7 @@ def _run_whisper_asr(audio_path: Path) -> list | None:
 
         if not encoder.exists():
             print(f"[ASR] Whisper model not found at {model_dir}")
-            return _mock_asr()
+            return None
 
         recognizer = sherpa_onnx.OfflineRecognizer.from_whisper(
             encoder=str(encoder),
@@ -185,7 +185,7 @@ def _run_whisper_asr(audio_path: Path) -> list | None:
 
     except ImportError:
         print("[ASR] sherpa-onnx not installed")
-        return _mock_asr()
+        return None
     except Exception as e:
         print(f"[ASR error] {e}")
         return None

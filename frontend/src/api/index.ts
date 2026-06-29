@@ -30,6 +30,8 @@ export const transcriptApi = {
     api.get<TranscriptSegment[]>(`/transcript-segments/meeting/${meetingId}`).then(r => r.data),
   update: (segmentId: string, data: { edited_text?: string; speaker_label?: string }) =>
     api.patch<TranscriptSegment>(`/transcript-segments/${segmentId}`, data).then(r => r.data),
+  clear: (meetingId: string) =>
+    api.delete(`/transcript-segments/meeting/${meetingId}`).then(r => r.data),
   renameSpeaker: (meetingId: string, speaker_label: string, display_name: string) =>
     api.post(`/transcript-segments/meeting/${meetingId}/rename-speaker`, { speaker_label, display_name }).then(r => r.data),
 }

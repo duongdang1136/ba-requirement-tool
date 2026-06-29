@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.core.database import get_db
+from app.models.meeting import Meeting
 from app.models.transcript import TranscriptSegment, Speaker
 
 router = APIRouter()
@@ -45,6 +46,31 @@ def get_transcript(meeting_id: str, db: Session = Depends(get_db)):
         .all()
     )
     return segments
+
+
+@router.delete("/meeting/{meeting_id}")
+def clear_transcript(meeting_id: str, db: Session = Depends(get_db)):
+    meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    deleted_segments = (
+        db.query(TranscriptSegment)
+        .filter(TranscriptSegment.meeting_id == meeting_id)
+        .delete(synchronize_session=False)
+    )
+    deleted_speakers = (
+        db.query(Speaker)
+        .filter(Speaker.meeting_id == meeting_id)
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+
+    return {
+        "meeting_id": meeting_id,
+        "deleted_segments": deleted_segments,
+        "deleted_speakers": deleted_speakers,
+    }
 
 
 @router.patch("/{segment_id}", response_model=SegmentOut)

@@ -6,19 +6,31 @@
 Upload audio/video → Local STT → Transcript review → Edit → Export
 ```
 
-## Quick Start (Docker)
+## Quick Start
 
-**Requires:** [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+For most users, run the app directly with npm scripts.
+
+**Prerequisites:**
+
+- Node.js 20+
+- Python 3.10+
+- ffmpeg
 
 ```bash
 git clone https://github.com/duongdang1136/ba-requirement-tool.git
 cd ba-requirement-tool
-docker compose up --build
+npm install
+npm run setup
+npm run dev
 ```
 
 Then open → **http://localhost:5173**
 
-That's it. No Python, no Node, no ffmpeg setup needed.
+`npm run setup` installs frontend dependencies, creates the backend Python virtual environment, installs backend dependencies, and downloads the default sherpa-onnx Whisper small ASR model.
+
+The first setup downloads roughly 600MB of model files. Later runs reuse the local model.
+
+To stop the app, press `Ctrl+C` in the terminal running `npm run dev`.
 
 ---
 
@@ -30,9 +42,90 @@ That's it. No Python, no Node, no ffmpeg setup needed.
 - ✏️ Edit transcript text (preserves original + traceability)
 - 💾 Export reviewed transcript to **Markdown** or **TXT**
 
+## Install Prerequisites
+
+### Windows
+
+Install:
+
+- Node.js LTS from https://nodejs.org
+- Python from https://www.python.org/downloads/
+- ffmpeg with one of these options:
+
+```powershell
+winget install Gyan.FFmpeg
+```
+
+or:
+
+```powershell
+choco install ffmpeg
+```
+
+After installing, open a new terminal and check:
+
+```bash
+node --version
+npm --version
+python --version
+ffmpeg -version
+```
+
+### macOS
+
+```bash
+brew install node python ffmpeg
+```
+
+### Ubuntu / WSL
+
+```bash
+sudo apt update
+sudo apt install -y nodejs npm python3 python3-venv ffmpeg
+```
+
+## Daily Usage
+
+After setup is complete:
+
+```bash
+cd ba-requirement-tool
+npm run dev
+```
+
+Open:
+
+```text
+http://localhost:5173
+```
+
+The frontend runs on port `5173`. The backend runs on port `8099`.
+
+Local runtime data is stored in:
+
+- `backend/ba_tool.db`
+- `backend/uploads/`
+- `models/`
+
+These are ignored by git and should not be committed.
+
+## Optional Docker Usage
+
+Docker is still supported if you prefer a containerized setup:
+
+```bash
+git clone https://github.com/duongdang1136/ba-requirement-tool.git
+cd ba-requirement-tool
+docker compose up --build
+```
+
+Then open → **http://localhost:5173**
+
+Docker stores SQLite, uploads, and ASR models in Docker volumes. Stop with `Ctrl+C`, or use `docker compose down` if running in detached mode.
+
 ## For Developers
 
-### Dev mode (without Docker)
+### Manual Dev Mode
 
 **Prerequisites:** Python 3.10+, Node 18+, ffmpeg
 
@@ -54,23 +147,24 @@ Open → http://localhost:5173
 
 ### Speech-to-Text (sherpa-onnx)
 
-The app ships with a **mock ASR** for testing. To enable real local speech recognition:
+`npm run setup` enables real local speech recognition automatically. For manual development, install sherpa-onnx and download a model manually:
 
 1. Install sherpa-onnx:
 ```bash
 pip install sherpa-onnx soundfile
 ```
 
-2. Download a model (example — SenseVoice multilingual):
+2. Download the default Whisper small model:
 ```bash
 mkdir -p models/asr
-# Download from: https://github.com/k2-fsa/sherpa-onnx/releases
-# Place model.int8.onnx + tokens.txt in models/asr/
+curl -L -o models/asr/sherpa-onnx-whisper-small.tar.bz2 \
+  https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.tar.bz2
+tar -xjf models/asr/sherpa-onnx-whisper-small.tar.bz2 -C models/asr
 ```
 
 3. Set in `.env`:
 ```
-ASR_MODEL_DIR=./models/asr
+ASR_MODEL_DIR=../models/asr/sherpa-onnx-whisper-small
 ```
 
 See [sherpa-onnx docs](https://k2-fsa.github.io/sherpa/onnx/index.html) for model options (Vietnamese, English, multilingual).
@@ -87,8 +181,8 @@ cp backend/.env.example backend/.env
 |---|---|---|
 | `DATABASE_URL` | `sqlite:///./data/ba_tool.db` | Database |
 | `UPLOAD_DIR` | `./uploads` | Where files are stored |
-| `ASR_MODEL_DIR` | `./models/asr` | sherpa-onnx model path |
-| `ASR_LANGUAGE` | `en` | Primary meeting language |
+| `ASR_MODEL_DIR` | `../models/asr/sherpa-onnx-whisper-small` | sherpa-onnx model path |
+| `ASR_LANGUAGE` | `vi` | Primary meeting language |
 | `MAX_UPLOAD_SIZE_MB` | `500` | File size limit |
 | `LLM_PROVIDER` | `openai` | For Phase 2 extraction |
 | `OPENAI_API_KEY` | `` | OpenAI key (Phase 2) |
@@ -141,7 +235,7 @@ ba-requirement-tool/
 | | |
 |---|---|
 | Backend | FastAPI (Python) |
-| Database | SQLite → PostgreSQL |
+| Database | SQLite in Docker volume |
 | Speech | sherpa-onnx (offline) |
 | Audio | ffmpeg |
 | Frontend | React + TypeScript + Vite |

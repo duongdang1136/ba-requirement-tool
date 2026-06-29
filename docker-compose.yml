@@ -7,13 +7,15 @@ services:
     ports:
       - "8099:8000"
     volumes:
-      - ./uploads:/app/uploads
-      - ./models:/app/models
-      - ./data:/app/data
+      - ba_uploads:/app/uploads
+      - ba_models:/app/models
+      - ba_data:/app/data
     environment:
       - DATABASE_URL=sqlite:////app/data/ba_tool.db
       - UPLOAD_DIR=/app/uploads
       - MODELS_DIR=/app/models
+      - ASR_MODEL_DIR=/app/models/asr/sherpa-onnx-whisper-small
+      - ASR_LANGUAGE=vi
       - CORS_ORIGINS=["http://localhost:5173","http://localhost:3000","http://localhost:80"]
     restart: unless-stopped
 
@@ -29,6 +31,6 @@ services:
     restart: unless-stopped
 
 volumes:
-  uploads:
-  models:
-  data:
+  ba_uploads:
+  ba_models:
+  ba_data:

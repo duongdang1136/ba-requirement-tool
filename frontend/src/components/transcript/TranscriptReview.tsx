@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { meetingsApi, transcriptApi, exportApi } from '../../api'
-import type { TranscriptSegment, ProcessingStatus } from '../types'
+import type { TranscriptSegment, ProcessingStatus } from '../../types'
 
 interface Props {
   meetingId: string
@@ -68,6 +68,18 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
     URL.revokeObjectURL(url)
   }
 
+  async function clearTranscript() {
+    const confirmed = window.confirm('Clear transcript segments for this meeting? This does not delete the meeting or uploaded file.')
+    if (!confirmed) return
+
+    setLoading(true)
+    await transcriptApi.clear(meetingId)
+    setSegments([])
+    setEditingId(null)
+    setEditText('')
+    setLoading(false)
+  }
+
   if (!status) {
     return (
       <div style={{ padding: 24 }}>
@@ -101,6 +113,7 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
         <div style={{ marginBottom: 24, display: 'flex', gap: 8 }}>
           <button onClick={() => downloadExport('markdown')} style={btnStyle}>Export Markdown</button>
           <button onClick={() => downloadExport('txt')} style={btnStyle}>Export TXT</button>
+          <button onClick={clearTranscript} disabled={loading} style={btnDanger}>Clear Transcript</button>
         </div>
       )}
 
@@ -173,6 +186,16 @@ const btnOutline: React.CSSProperties = {
   background: 'white',
   color: '#1a73e8',
   border: '1px solid #1a73e8',
+  borderRadius: 6,
+  cursor: 'pointer',
+  fontSize: 13,
+}
+
+const btnDanger: React.CSSProperties = {
+  padding: '8px 16px',
+  background: '#b3261e',
+  color: 'white',
+  border: 'none',
   borderRadius: 6,
   cursor: 'pointer',
   fontSize: 13,
