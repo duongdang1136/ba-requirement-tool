@@ -44,7 +44,7 @@ def export_transcript_markdown(meeting_id: str, db: Session = Depends(get_db)):
 
     for seg in segments:
         time_str = f"{_format_time(seg.start)} - {_format_time(seg.end)}"
-        text = seg.edited_text or seg.refined_text or seg.original_text
+        text = seg.edited_text if seg.edited_text else seg.original_text
         speaker = speaker_names.get(seg.speaker_label) or seg.speaker_label
         lines.append(f"**{time_str}** `{speaker}`")
         lines.append(f"{text}\n")
@@ -77,7 +77,7 @@ def export_transcript_txt(meeting_id: str, db: Session = Depends(get_db)):
     lines = [f"Meeting Transcript — {meeting.title}", "=" * 50, ""]
     for seg in segments:
         time_str = f"{_format_time(seg.start)} - {_format_time(seg.end)}"
-        text = seg.edited_text or seg.refined_text or seg.original_text
+        text = seg.edited_text if seg.edited_text else seg.original_text
         speaker = speaker_names.get(seg.speaker_label) or seg.speaker_label
         lines.append(f"[{time_str}] {speaker}")
         lines.append(text)

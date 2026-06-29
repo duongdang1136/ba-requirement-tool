@@ -15,7 +15,6 @@ class TranscriptSegment(Base):
     end: Mapped[float] = mapped_column(Float, nullable=False)
     speaker_label: Mapped[str] = mapped_column(String(50), default="SPEAKER_00")
     original_text: Mapped[str] = mapped_column(Text, nullable=False)
-    refined_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     edited_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     sequence: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -23,11 +22,7 @@ class TranscriptSegment(Base):
 
     @property
     def display_text(self) -> str:
-        if self.edited_text is not None:
-            return self.edited_text
-        if self.refined_text is not None:
-            return self.refined_text
-        return self.original_text
+        return self.edited_text if self.edited_text is not None else self.original_text
 
 
 class Speaker(Base):

@@ -18,7 +18,6 @@ class SegmentOut(BaseModel):
     end: float
     speaker_label: str
     original_text: str
-    refined_text: Optional[str]
     edited_text: Optional[str]
     display_text: str
     sequence: int

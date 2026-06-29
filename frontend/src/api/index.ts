@@ -1,5 +1,5 @@
 import api from './client'
-import type { Project, Meeting, ProcessingStatus, TranscriptSegment, Speaker, AISettings, RequirementCandidate, Requirement } from '../types'
+import type { Project, Meeting, ProcessingStatus, TranscriptSegment, Speaker, RequirementCandidate, Requirement } from '../types'
 
 // Projects
 export const projectsApi = {
@@ -36,17 +36,6 @@ export const transcriptApi = {
     api.delete(`/transcript-segments/meeting/${meetingId}`).then(r => r.data),
   renameSpeaker: (meetingId: string, speaker_label: string, display_name: string) =>
     api.post(`/transcript-segments/meeting/${meetingId}/rename-speaker`, { speaker_label, display_name }).then(r => r.data),
-}
-
-// AI settings / refinement
-export const aiSettingsApi = {
-  get: () => api.get<AISettings>('/ai-settings').then(r => r.data),
-  update: (data: { api_key?: string; model: string }) =>
-    api.put<AISettings>('/ai-settings', data).then(r => r.data),
-  refineSegment: (segmentId: string) =>
-    api.post<TranscriptSegment>(`/ai-settings/transcript-segments/${segmentId}/refine`).then(r => r.data),
-  refineMeeting: (meetingId: string) =>
-    api.post<{ refined_count: number }>(`/ai-settings/meetings/${meetingId}/refine-transcript`).then(r => r.data),
 }
 
 // Requirements
