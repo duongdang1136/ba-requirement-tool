@@ -43,6 +43,8 @@ export const aiSettingsApi = {
   get: () => api.get<AISettings>('/ai-settings').then(r => r.data),
   update: (data: { api_key?: string; model: string }) =>
     api.put<AISettings>('/ai-settings', data).then(r => r.data),
+  test: () =>
+    api.post<{ ok: boolean; message: string }>('/ai-settings/test').then(r => r.data),
   refineSegment: (segmentId: string) =>
     api.post<TranscriptSegment>(`/ai-settings/transcript-segments/${segmentId}/refine`).then(r => r.data),
   refineMeeting: (meetingId: string) =>
