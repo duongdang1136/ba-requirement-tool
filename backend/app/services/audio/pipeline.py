@@ -181,7 +181,7 @@ def _detect_speech_intervals(audio_path: Path) -> list[SpeechInterval] | None:
         config = sherpa_onnx.VadModelConfig()
         config.silero_vad.model = str(vad_model)
         config.silero_vad.threshold = 0.5
-        config.silero_vad.min_silence_duration = 0.35
+        config.silero_vad.min_silence_duration = 0.7
         config.silero_vad.min_speech_duration = 0.25
         config.silero_vad.max_speech_duration = 28
         config.sample_rate = sample_rate
@@ -224,7 +224,7 @@ def _detect_speech_intervals(audio_path: Path) -> list[SpeechInterval] | None:
         return None
 
 
-def _merge_intervals(intervals: list[SpeechInterval], gap: float = 0.4, max_duration: float = 28.0) -> list[SpeechInterval]:
+def _merge_intervals(intervals: list[SpeechInterval], gap: float = 1.2, max_duration: float = 28.0) -> list[SpeechInterval]:
     if not intervals:
         return []
 
@@ -243,15 +243,21 @@ def _merge_intervals(intervals: list[SpeechInterval], gap: float = 0.4, max_dura
     return merged
 
 
-def _split_intervals(intervals: list[SpeechInterval], max_duration: float = 28.0) -> list[SpeechInterval]:
-    """Whisper ONNX only accepts chunks under 30s, so enforce a hard cap."""
+def _split_intervals(
+    intervals: list[SpeechInterval],
+    duration: float,
+    max_duration: float = 28.0,
+    padding: float = 0.6,
+    overlap: float = 1.0,
+) -> list[SpeechInterval]:
+    """Whisper ONNX only accepts chunks under 30s, so enforce a hard cap with context."""
     split: list[SpeechInterval] = []
     for interval in intervals:
-        start = interval["start"]
-        end = interval["end"]
+        start = max(0.0, interval["start"] - padding)
+        end = min(duration, interval["end"] + padding)
         while end - start > max_duration:
             split.append({"start": round(start, 2), "end": round(start + max_duration, 2)})
-            start += max_duration
+            start += max_duration - overlap
         if end > start:
             split.append({"start": round(start, 2), "end": round(end, 2)})
     return split
@@ -292,7 +298,7 @@ def _run_whisper_asr(audio_path: Path, speech_intervals: list[SpeechInterval]) -
             return [{"start": 0.0, "end": duration, "text": "(Không phát hiện giọng nói)", "speaker": "SPEAKER_00"}]
 
         segments: list[TranscriptCandidate] = []
-        for interval in _split_intervals(speech_intervals):
+        for interval in _split_intervals(speech_intervals, duration):
             start_sec = max(0.0, interval["start"])
             end_sec = min(duration, interval["end"])
             start_sample = int(start_sec * sample_rate)
