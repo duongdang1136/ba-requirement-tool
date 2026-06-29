@@ -24,6 +24,7 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
   const [geminiKey, setGeminiKey] = useState('')
   const [geminiModel, setGeminiModel] = useState('gemini-2.0-flash')
   const [loading, setLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
     loadStatus()
@@ -106,11 +107,17 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
   }
 
   async function saveGeminiSettings() {
+    setErrorMessage('')
     setLoading(true)
-    const settings = await aiSettingsApi.update({ api_key: geminiKey || undefined, model: geminiModel })
-    setAiSettings(settings)
-    setGeminiKey('')
-    setLoading(false)
+    try {
+      const settings = await aiSettingsApi.update({ api_key: geminiKey || undefined, model: geminiModel })
+      setAiSettings(settings)
+      setGeminiKey('')
+    } catch (error) {
+      setErrorMessage(readApiError(error))
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function refineAll() {
@@ -119,10 +126,16 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
       return
     }
 
+    setErrorMessage('')
     setLoading(true)
-    await aiSettingsApi.refineMeeting(meetingId)
-    await loadTranscript()
-    setLoading(false)
+    try {
+      await aiSettingsApi.refineMeeting(meetingId)
+      await loadTranscript()
+    } catch (error) {
+      setErrorMessage(readApiError(error))
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function refineOne(segmentId: string) {
@@ -131,10 +144,16 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
       return
     }
 
+    setErrorMessage('')
     setLoading(true)
-    const updated = await aiSettingsApi.refineSegment(segmentId)
-    setSegments(prev => prev.map(s => s.id === segmentId ? updated : s))
-    setLoading(false)
+    try {
+      const updated = await aiSettingsApi.refineSegment(segmentId)
+      setSegments(prev => prev.map(s => s.id === segmentId ? updated : s))
+    } catch (error) {
+      setErrorMessage(readApiError(error))
+    } finally {
+      setLoading(false)
+    }
   }
 
   function speakerDisplay(label: string) {
@@ -201,6 +220,11 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
           <div>
             <button onClick={saveGeminiSettings} disabled={loading} style={btnOutline}>Save Gemini Settings</button>
           </div>
+          {errorMessage && (
+            <div style={{ color: '#b3261e', fontSize: 13, lineHeight: 1.5 }}>
+              {errorMessage}
+            </div>
+          )}
         </div>
       </div>
 
@@ -339,4 +363,13 @@ const inputStyle: React.CSSProperties = {
   border: '1px solid #ccc',
   borderRadius: 6,
   fontSize: 13,
+}
+
+function readApiError(error: unknown): string {
+  if (typeof error === 'object' && error !== null && 'response' in error) {
+    const response = (error as { response?: { data?: { detail?: string } } }).response
+    if (response?.data?.detail) return response.data.detail
+  }
+  if (error instanceof Error) return error.message
+  return 'Unexpected error'
 }

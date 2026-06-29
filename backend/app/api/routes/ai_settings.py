@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.settings import AISettings
 from app.models.transcript import TranscriptSegment
-from app.services.ai.gemini import refine_vietnamese_transcript
+from app.services.ai.gemini import GeminiRefineError, refine_vietnamese_transcript
 
 router = APIRouter()
 
@@ -80,8 +80,12 @@ def refine_segment(segment_id: str, db: Session = Depends(get_db)):
             text=segment.original_text,
             speaker=segment.speaker_label,
         )
-    except Exception as e:
+    except GeminiRefineError as e:
+        print(f"[Gemini refine error] {e}")
         raise HTTPException(status_code=502, detail=f"Gemini refine failed: {e}") from e
+    except Exception as e:
+        print(f"[Gemini unexpected error] {e}")
+        raise HTTPException(status_code=500, detail=f"Gemini refine failed unexpectedly: {e}") from e
 
     db.commit()
     db.refresh(segment)
@@ -115,9 +119,14 @@ def refine_meeting_transcript(meeting_id: str, db: Session = Depends(get_db)):
                 speaker=segment.speaker_label,
             )
             refined_count += 1
+        except GeminiRefineError as e:
+            db.rollback()
+            print(f"[Gemini refine error] {e}")
+            raise HTTPException(status_code=502, detail=f"Gemini refine failed: {e}") from e
         except Exception as e:
             db.rollback()
-            raise HTTPException(status_code=502, detail=f"Gemini refine failed: {e}") from e
+            print(f"[Gemini unexpected error] {e}")
+            raise HTTPException(status_code=500, detail=f"Gemini refine failed unexpectedly: {e}") from e
 
     db.commit()
     return RefineResult(refined_count=refined_count)
