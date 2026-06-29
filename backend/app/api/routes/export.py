@@ -5,6 +5,7 @@ from typing import Optional
 
 from app.core.database import get_db
 from app.models.transcript import TranscriptSegment
+from app.models.transcript import Speaker
 from app.models.requirement import Requirement
 from app.models.meeting import Meeting
 
@@ -31,6 +32,10 @@ def export_transcript_markdown(meeting_id: str, db: Session = Depends(get_db)):
         .order_by(TranscriptSegment.sequence)
         .all()
     )
+    speaker_names = {
+        speaker.speaker_label: speaker.display_name
+        for speaker in db.query(Speaker).filter(Speaker.meeting_id == meeting_id).all()
+    }
 
     lines = [f"# Meeting Transcript — {meeting.title}\n"]
     if meeting.meeting_date:
@@ -40,7 +45,8 @@ def export_transcript_markdown(meeting_id: str, db: Session = Depends(get_db)):
     for seg in segments:
         time_str = f"{_format_time(seg.start)} - {_format_time(seg.end)}"
         text = seg.edited_text if seg.edited_text else seg.original_text
-        lines.append(f"**{time_str}** `{seg.speaker_label}`")
+        speaker = speaker_names.get(seg.speaker_label) or seg.speaker_label
+        lines.append(f"**{time_str}** `{speaker}`")
         lines.append(f"{text}\n")
 
     content = "\n".join(lines)
@@ -63,12 +69,17 @@ def export_transcript_txt(meeting_id: str, db: Session = Depends(get_db)):
         .order_by(TranscriptSegment.sequence)
         .all()
     )
+    speaker_names = {
+        speaker.speaker_label: speaker.display_name
+        for speaker in db.query(Speaker).filter(Speaker.meeting_id == meeting_id).all()
+    }
 
     lines = [f"Meeting Transcript — {meeting.title}", "=" * 50, ""]
     for seg in segments:
         time_str = f"{_format_time(seg.start)} - {_format_time(seg.end)}"
         text = seg.edited_text if seg.edited_text else seg.original_text
-        lines.append(f"[{time_str}] {seg.speaker_label}")
+        speaker = speaker_names.get(seg.speaker_label) or seg.speaker_label
+        lines.append(f"[{time_str}] {speaker}")
         lines.append(text)
         lines.append("")
 

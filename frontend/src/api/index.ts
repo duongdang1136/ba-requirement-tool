@@ -1,5 +1,5 @@
 import api from './client'
-import type { Project, Meeting, ProcessingStatus, TranscriptSegment, RequirementCandidate, Requirement } from '../types'
+import type { Project, Meeting, ProcessingStatus, TranscriptSegment, Speaker, RequirementCandidate, Requirement } from '../types'
 
 // Projects
 export const projectsApi = {
@@ -28,6 +28,8 @@ export const meetingsApi = {
 export const transcriptApi = {
   get: (meetingId: string) =>
     api.get<TranscriptSegment[]>(`/transcript-segments/meeting/${meetingId}`).then(r => r.data),
+  speakers: (meetingId: string) =>
+    api.get<Speaker[]>(`/transcript-segments/meeting/${meetingId}/speakers`).then(r => r.data),
   update: (segmentId: string, data: { edited_text?: string; speaker_label?: string }) =>
     api.patch<TranscriptSegment>(`/transcript-segments/${segmentId}`, data).then(r => r.data),
   clear: (meetingId: string) =>

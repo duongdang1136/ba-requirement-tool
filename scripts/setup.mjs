@@ -13,6 +13,14 @@ const venvPython = isWindows
 const modelDir = join(root, 'models', 'asr', 'sherpa-onnx-whisper-small')
 const modelUrl = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.tar.bz2'
 const archivePath = join(root, 'models', 'asr', 'sherpa-onnx-whisper-small.tar.bz2')
+const vadModelPath = join(root, 'models', 'vad', 'silero_vad.onnx')
+const vadModelUrl = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx'
+const diarizationDir = join(root, 'models', 'diarization')
+const segmentationDir = join(diarizationDir, 'sherpa-onnx-pyannote-segmentation-3-0')
+const segmentationArchive = join(diarizationDir, 'sherpa-onnx-pyannote-segmentation-3-0.tar.bz2')
+const segmentationUrl = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2'
+const embeddingModelPath = join(diarizationDir, '3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx')
+const embeddingModelUrl = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx'
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -84,6 +92,48 @@ target.mkdir(parents=True, exist_ok=True)
 with tarfile.open(archive, 'r:bz2') as f:
     f.extractall(target)
 archive.unlink()
+`])
+}
+
+mkdirSync(join(root, 'models', 'vad'), { recursive: true })
+if (existsSync(vadModelPath)) {
+  console.log('VAD model already exists.')
+} else {
+  console.log('Downloading Silero VAD model...')
+  run(venvPython, ['-c', `
+from urllib.request import urlretrieve
+urlretrieve(${JSON.stringify(vadModelUrl)}, ${JSON.stringify(vadModelPath)})
+`])
+}
+
+mkdirSync(diarizationDir, { recursive: true })
+if (existsSync(join(segmentationDir, 'model.onnx'))) {
+  console.log('Speaker segmentation model already exists.')
+} else {
+  console.log('Downloading speaker segmentation model...')
+  run(venvPython, ['-c', `
+from urllib.request import urlretrieve
+urlretrieve(${JSON.stringify(segmentationUrl)}, ${JSON.stringify(segmentationArchive)})
+`])
+  console.log('Extracting speaker segmentation model...')
+  run(venvPython, ['-c', `
+import tarfile
+from pathlib import Path
+archive = Path(${JSON.stringify(segmentationArchive)})
+target = Path(${JSON.stringify(diarizationDir)})
+with tarfile.open(archive, 'r:bz2') as f:
+    f.extractall(target)
+archive.unlink()
+`])
+}
+
+if (existsSync(embeddingModelPath)) {
+  console.log('Speaker embedding model already exists.')
+} else {
+  console.log('Downloading speaker embedding model...')
+  run(venvPython, ['-c', `
+from urllib.request import urlretrieve
+urlretrieve(${JSON.stringify(embeddingModelUrl)}, ${JSON.stringify(embeddingModelPath)})
 `])
 }
 

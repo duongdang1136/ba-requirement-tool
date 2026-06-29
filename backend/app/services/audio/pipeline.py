@@ -1,15 +1,34 @@
 """
 Audio processing pipeline:
-normalize → ASR (sherpa-onnx Whisper small, Vietnamese) → store segments
+normalize → VAD → ASR → diarization → merge → store segments
 """
 import subprocess
 from pathlib import Path
 from datetime import datetime
+from typing import TypedDict
 
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.meeting import ProcessingJob, MediaFile
 from app.models.transcript import TranscriptSegment
+
+
+class TranscriptCandidate(TypedDict):
+    start: float
+    end: float
+    text: str
+    speaker: str
+
+
+class SpeechInterval(TypedDict):
+    start: float
+    end: float
+
+
+class SpeakerTurn(TypedDict):
+    start: float
+    end: float
+    speaker: str
 
 
 def run_pipeline(meeting_id: str, job_id: str):
@@ -44,19 +63,39 @@ def run_pipeline(meeting_id: str, job_id: str):
             return
 
         media.normalized_path = str(normalized_path)
-        job.progress = 35
+        job.progress = 30
+        job.step = "vad"
+        db.commit()
+
+        speech_intervals = _detect_speech_intervals(normalized_path)
+        if speech_intervals is None:
+            job.status = "failed"
+            job.error = "VAD failed — check VAD model path"
+            db.commit()
+            return
+
+        job.progress = 45
         job.step = "asr"
         db.commit()
 
         # Step 2: Run Whisper ASR
-        segments = _run_whisper_asr(normalized_path)
+        segments = _run_whisper_asr(normalized_path, speech_intervals)
         if segments is None:
             job.status = "failed"
             job.error = "ASR failed — check model path"
             db.commit()
             return
 
-        job.progress = 85
+        job.progress = 75
+        job.step = "diarize"
+        db.commit()
+
+        speaker_turns = _run_diarization(normalized_path)
+        if speaker_turns:
+            for seg in segments:
+                seg["speaker"] = _assign_speaker(seg["start"], seg["end"], speaker_turns)
+
+        job.progress = 90
         job.step = "merge"
         db.commit()
 
@@ -71,7 +110,7 @@ def run_pipeline(meeting_id: str, job_id: str):
                 meeting_id=meeting_id,
                 start=seg["start"],
                 end=seg["end"],
-                speaker_label="SPEAKER_00",
+                speaker_label=seg.get("speaker", "SPEAKER_00"),
                 original_text=text,
                 sequence=i,
             ))
@@ -121,7 +160,90 @@ def _normalize_audio(input_path: str, meeting_id: str) -> Path | None:
         return None
 
 
-def _run_whisper_asr(audio_path: Path) -> list | None:
+def _detect_speech_intervals(audio_path: Path) -> list[SpeechInterval] | None:
+    """Return speech intervals in original audio timeline."""
+    try:
+        import numpy as np
+        import sherpa_onnx
+        import soundfile as sf
+
+        vad_model = Path(settings.vad_model_path)
+        if not vad_model.exists():
+            print(f"[VAD] Model not found at {vad_model}")
+            return None
+
+        samples, sample_rate = sf.read(str(audio_path), dtype="float32", always_2d=True)
+        samples = np.ascontiguousarray(samples[:, 0])
+        if sample_rate != 16000:
+            print(f"[VAD] Expected 16kHz normalized audio, got {sample_rate}")
+            return None
+
+        config = sherpa_onnx.VadModelConfig()
+        config.silero_vad.model = str(vad_model)
+        config.silero_vad.threshold = 0.5
+        config.silero_vad.min_silence_duration = 0.35
+        config.silero_vad.min_speech_duration = 0.25
+        config.silero_vad.max_speech_duration = 28
+        config.sample_rate = sample_rate
+
+        vad = sherpa_onnx.VoiceActivityDetector(config, buffer_size_in_seconds=60)
+        window_size = config.silero_vad.window_size
+        offset = 0
+        intervals: list[SpeechInterval] = []
+
+        while offset + window_size <= len(samples):
+            vad.accept_waveform(samples[offset: offset + window_size])
+            offset += window_size
+            while not vad.empty():
+                segment = vad.front
+                intervals.append({
+                    "start": round(segment.start / sample_rate, 2),
+                    "end": round((segment.start + len(segment.samples)) / sample_rate, 2),
+                })
+                vad.pop()
+
+        if offset < len(samples):
+            vad.accept_waveform(samples[offset:])
+
+        vad.flush()
+        while not vad.empty():
+            segment = vad.front
+            intervals.append({
+                "start": round(segment.start / sample_rate, 2),
+                "end": round((segment.start + len(segment.samples)) / sample_rate, 2),
+            })
+            vad.pop()
+
+        return _merge_intervals(intervals)
+
+    except ImportError:
+        print("[VAD] sherpa-onnx or soundfile not installed")
+        return None
+    except Exception as e:
+        print(f"[VAD error] {e}")
+        return None
+
+
+def _merge_intervals(intervals: list[SpeechInterval], gap: float = 0.4, max_duration: float = 28.0) -> list[SpeechInterval]:
+    if not intervals:
+        return []
+
+    merged: list[SpeechInterval] = []
+    current = dict(intervals[0])
+    for interval in intervals[1:]:
+        would_merge = interval["start"] - current["end"] <= gap
+        would_fit = interval["end"] - current["start"] <= max_duration
+        if would_merge and would_fit:
+            current["end"] = max(current["end"], interval["end"])
+        else:
+            merged.append({"start": current["start"], "end": current["end"]})
+            current = dict(interval)
+
+    merged.append({"start": current["start"], "end": current["end"]})
+    return merged
+
+
+def _run_whisper_asr(audio_path: Path, speech_intervals: list[SpeechInterval]) -> list[TranscriptCandidate] | None:
     """
     Run sherpa-onnx Whisper small ASR — supports Vietnamese.
     Returns list of {start, end, text} dicts.
@@ -149,24 +271,21 @@ def _run_whisper_asr(audio_path: Path) -> list | None:
             task="transcribe",
         )
 
-        # Load audio
         samples, sample_rate = sf.read(str(audio_path), dtype="float32", always_2d=False)
         duration = len(samples) / sample_rate
 
-        # Whisper works best with 30s chunks
-        chunk_sec = 28
-        chunk_size = chunk_sec * sample_rate
-        overlap_sec = 1
-        overlap = overlap_sec * sample_rate
+        if not speech_intervals:
+            return [{"start": 0.0, "end": duration, "text": "(Không phát hiện giọng nói)", "speaker": "SPEAKER_00"}]
 
-        segments = []
-        pos = 0
-        seq = 0
-
-        while pos < len(samples):
-            chunk = samples[pos: pos + chunk_size]
-            start_sec = round(pos / sample_rate, 2)
-            end_sec   = round(min((pos + len(chunk)) / sample_rate, duration), 2)
+        segments: list[TranscriptCandidate] = []
+        for interval in speech_intervals:
+            start_sec = max(0.0, interval["start"])
+            end_sec = min(duration, interval["end"])
+            start_sample = int(start_sec * sample_rate)
+            end_sample = int(end_sec * sample_rate)
+            chunk = samples[start_sample:end_sample]
+            if len(chunk) == 0:
+                continue
 
             stream = recognizer.create_stream()
             stream.accept_waveform(sample_rate, chunk)
@@ -174,14 +293,14 @@ def _run_whisper_asr(audio_path: Path) -> list | None:
             text = stream.result.text.strip()
 
             if text:
-                segments.append({"start": start_sec, "end": end_sec, "text": text})
-                seq += 1
+                segments.append({
+                    "start": round(start_sec, 2),
+                    "end": round(end_sec, 2),
+                    "text": text,
+                    "speaker": "SPEAKER_00",
+                })
 
-            pos += chunk_size - overlap
-            if pos >= len(samples):
-                break
-
-        return segments if segments else [{"start": 0.0, "end": duration, "text": "(Không nhận dạng được âm thanh)"}]
+        return segments if segments else [{"start": 0.0, "end": duration, "text": "(Không nhận dạng được âm thanh)", "speaker": "SPEAKER_00"}]
 
     except ImportError:
         print("[ASR] sherpa-onnx not installed")
@@ -191,8 +310,69 @@ def _run_whisper_asr(audio_path: Path) -> list | None:
         return None
 
 
-def _mock_asr() -> list:
-    return [
-        {"start": 0.0, "end": 5.0, "text": "[Chưa cài model ASR — đây là transcript mẫu]"},
-        {"start": 5.1, "end": 10.0, "text": "[Cài sherpa-onnx và download model Whisper small để nhận transcript thật]"},
-    ]
+def _run_diarization(audio_path: Path) -> list[SpeakerTurn] | None:
+    try:
+        import numpy as np
+        import sherpa_onnx
+        import soundfile as sf
+
+        segmentation_model = Path(settings.diarization_segmentation_model)
+        embedding_model = Path(settings.diarization_embedding_model)
+        if not segmentation_model.exists() or not embedding_model.exists():
+            print(f"[Diarization] Models not found: {segmentation_model}, {embedding_model}")
+            return None
+
+        config = sherpa_onnx.OfflineSpeakerDiarizationConfig(
+            segmentation=sherpa_onnx.OfflineSpeakerSegmentationModelConfig(
+                pyannote=sherpa_onnx.OfflineSpeakerSegmentationPyannoteModelConfig(
+                    model=str(segmentation_model),
+                ),
+            ),
+            embedding=sherpa_onnx.SpeakerEmbeddingExtractorConfig(
+                model=str(embedding_model),
+            ),
+            clustering=sherpa_onnx.FastClusteringConfig(
+                num_clusters=-1,
+                threshold=settings.diarization_cluster_threshold,
+            ),
+            min_duration_on=0.3,
+            min_duration_off=0.5,
+        )
+        if not config.validate():
+            print("[Diarization] Invalid config")
+            return None
+
+        diarizer = sherpa_onnx.OfflineSpeakerDiarization(config)
+        samples, sample_rate = sf.read(str(audio_path), dtype="float32", always_2d=True)
+        samples = np.ascontiguousarray(samples[:, 0])
+        if sample_rate != diarizer.sample_rate:
+            print(f"[Diarization] Expected {diarizer.sample_rate}Hz audio, got {sample_rate}")
+            return None
+
+        result = diarizer.process(samples).sort_by_start_time()
+        return [
+            {
+                "start": float(turn.start),
+                "end": float(turn.end),
+                "speaker": f"SPEAKER_{int(turn.speaker):02d}",
+            }
+            for turn in result
+        ]
+
+    except ImportError:
+        print("[Diarization] sherpa-onnx or soundfile not installed")
+        return None
+    except Exception as e:
+        print(f"[Diarization error] {e}")
+        return None
+
+
+def _assign_speaker(start: float, end: float, speaker_turns: list[SpeakerTurn]) -> str:
+    best_speaker = "SPEAKER_00"
+    best_overlap = 0.0
+    for turn in speaker_turns:
+        overlap = max(0.0, min(end, turn["end"]) - max(start, turn["start"]))
+        if overlap > best_overlap:
+            best_overlap = overlap
+            best_speaker = turn["speaker"]
+    return best_speaker

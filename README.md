@@ -26,9 +26,9 @@ npm run dev
 
 Then open → **http://localhost:5173**
 
-`npm run setup` installs frontend dependencies, creates the backend Python virtual environment, installs backend dependencies, and downloads the default sherpa-onnx Whisper small ASR model.
+`npm run setup` installs frontend dependencies, creates the backend Python virtual environment, installs backend dependencies, and downloads the default sherpa-onnx ASR, VAD, and speaker diarization models.
 
-The first setup downloads roughly 600MB of model files. Later runs reuse the local model.
+The first setup downloads large model files. Later runs reuse the local models.
 
 To stop the app, press `Ctrl+C` in the terminal running `npm run dev`.
 
@@ -37,7 +37,9 @@ To stop the app, press `Ctrl+C` in the terminal running `npm run dev`.
 ## What You Can Do (MVP)
 
 - 📁 Upload meeting audio/video (`.mp3` `.wav` `.m4a` `.mp4`)
-- ⚙️ Auto-process: normalize audio → transcribe with local speech-to-text
+- ⚙️ Auto-process: normalize audio → detect speech → transcribe with local speech-to-text
+- 👥 Detect speaker turns and label transcript segments
+- 🏷 Rename speaker labels, for example `SPEAKER_00` → `Client`
 - 📝 Review transcript by timestamp
 - ✏️ Edit transcript text (preserves original + traceability)
 - 💾 Export reviewed transcript to **Markdown** or **TXT**
@@ -147,14 +149,14 @@ Open → http://localhost:5173
 
 ### Speech-to-Text (sherpa-onnx)
 
-`npm run setup` enables real local speech recognition automatically. For manual development, install sherpa-onnx and download a model manually:
+`npm run setup` enables real local speech recognition, voice activity detection, and speaker diarization automatically. For manual development, install sherpa-onnx and download models manually:
 
 1. Install sherpa-onnx:
 ```bash
 pip install sherpa-onnx soundfile
 ```
 
-2. Download the default Whisper small model:
+2. Download the default Whisper small ASR model:
 ```bash
 mkdir -p models/asr
 curl -L -o models/asr/sherpa-onnx-whisper-small.tar.bz2 \
@@ -162,9 +164,24 @@ curl -L -o models/asr/sherpa-onnx-whisper-small.tar.bz2 \
 tar -xjf models/asr/sherpa-onnx-whisper-small.tar.bz2 -C models/asr
 ```
 
-3. Set in `.env`:
+3. Download VAD and speaker diarization models:
+```bash
+mkdir -p models/vad models/diarization
+curl -L -o models/vad/silero_vad.onnx \
+  https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx
+curl -L -o models/diarization/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2 \
+  https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2
+tar -xjf models/diarization/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2 -C models/diarization
+curl -L -o models/diarization/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx \
+  https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx
+```
+
+4. Set in `.env`:
 ```
 ASR_MODEL_DIR=../models/asr/sherpa-onnx-whisper-small
+VAD_MODEL_PATH=../models/vad/silero_vad.onnx
+DIARIZATION_SEGMENTATION_MODEL=../models/diarization/sherpa-onnx-pyannote-segmentation-3-0/model.onnx
+DIARIZATION_EMBEDDING_MODEL=../models/diarization/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx
 ```
 
 See [sherpa-onnx docs](https://k2-fsa.github.io/sherpa/onnx/index.html) for model options (Vietnamese, English, multilingual).
@@ -183,6 +200,10 @@ cp backend/.env.example backend/.env
 | `UPLOAD_DIR` | `./uploads` | Where files are stored |
 | `ASR_MODEL_DIR` | `../models/asr/sherpa-onnx-whisper-small` | sherpa-onnx model path |
 | `ASR_LANGUAGE` | `vi` | Primary meeting language |
+| `VAD_MODEL_PATH` | `../models/vad/silero_vad.onnx` | Silero VAD model |
+| `DIARIZATION_SEGMENTATION_MODEL` | `../models/diarization/sherpa-onnx-pyannote-segmentation-3-0/model.onnx` | Speaker segmentation model |
+| `DIARIZATION_EMBEDDING_MODEL` | `../models/diarization/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx` | Speaker embedding model |
+| `DIARIZATION_CLUSTER_THRESHOLD` | `0.5` | Speaker clustering threshold |
 | `MAX_UPLOAD_SIZE_MB` | `500` | File size limit |
 | `LLM_PROVIDER` | `openai` | For Phase 2 extraction |
 | `OPENAI_API_KEY` | `` | OpenAI key (Phase 2) |
@@ -218,13 +239,13 @@ ba-requirement-tool/
 ### MVP ✅
 - [x] Upload audio/video
 - [x] Normalize with ffmpeg
+- [x] Voice activity detection
 - [x] Local STT with sherpa-onnx
+- [x] Speaker diarization + rename
 - [x] Transcript review + edit
 - [x] Export Markdown / TXT
 
 ### Phase 2
-- [ ] Speaker diarization + rename
-- [ ] Voice activity detection
 - [ ] LLM requirement extraction
 - [ ] Requirement review workspace (approve/reject)
 - [ ] Open questions, decisions, action items

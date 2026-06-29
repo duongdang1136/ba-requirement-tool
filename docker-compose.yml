@@ -16,6 +16,9 @@ services:
       - MODELS_DIR=/app/models
       - ASR_MODEL_DIR=/app/models/asr/sherpa-onnx-whisper-small
       - ASR_LANGUAGE=vi
+      - VAD_MODEL_PATH=/app/models/vad/silero_vad.onnx
+      - DIARIZATION_SEGMENTATION_MODEL=/app/models/diarization/sherpa-onnx-pyannote-segmentation-3-0/model.onnx
+      - DIARIZATION_EMBEDDING_MODEL=/app/models/diarization/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx
       - CORS_ORIGINS=["http://localhost:5173","http://localhost:3000","http://localhost:80"]
     restart: unless-stopped
 

@@ -37,6 +37,11 @@ class SpeakerRename(BaseModel):
     display_name: str
 
 
+class SpeakerOut(BaseModel):
+    speaker_label: str
+    display_name: str
+
+
 @router.get("/meeting/{meeting_id}", response_model=List[SegmentOut])
 def get_transcript(meeting_id: str, db: Session = Depends(get_db)):
     segments = (
@@ -46,6 +51,28 @@ def get_transcript(meeting_id: str, db: Session = Depends(get_db)):
         .all()
     )
     return segments
+
+
+@router.get("/meeting/{meeting_id}/speakers", response_model=List[SpeakerOut])
+def get_speakers(meeting_id: str, db: Session = Depends(get_db)):
+    labels = [
+        row[0]
+        for row in (
+            db.query(TranscriptSegment.speaker_label)
+            .filter(TranscriptSegment.meeting_id == meeting_id)
+            .distinct()
+            .order_by(TranscriptSegment.speaker_label)
+            .all()
+        )
+    ]
+    speaker_names = {
+        speaker.speaker_label: speaker.display_name
+        for speaker in db.query(Speaker).filter(Speaker.meeting_id == meeting_id).all()
+    }
+    return [
+        SpeakerOut(speaker_label=label, display_name=speaker_names.get(label, ""))
+        for label in labels
+    ]
 
 
 @router.delete("/meeting/{meeting_id}")

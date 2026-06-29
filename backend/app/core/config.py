@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     # sherpa-onnx model
     asr_model_dir: str = str(REPO_ROOT / "models" / "asr" / "sherpa-onnx-whisper-small")
     asr_language: str = "vi"
+    vad_model_path: str = str(REPO_ROOT / "models" / "vad" / "silero_vad.onnx")
+    diarization_segmentation_model: str = str(REPO_ROOT / "models" / "diarization" / "sherpa-onnx-pyannote-segmentation-3-0" / "model.onnx")
+    diarization_embedding_model: str = str(REPO_ROOT / "models" / "diarization" / "3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx")
+    diarization_cluster_threshold: float = 0.5
 
     # File limits
     max_upload_size_mb: int = 500

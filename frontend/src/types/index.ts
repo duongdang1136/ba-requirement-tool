@@ -43,6 +43,11 @@ export interface TranscriptSegment {
   updated_at: string
 }
 
+export interface Speaker {
+  speaker_label: string
+  display_name: string
+}
+
 export interface RequirementCandidate {
   id: string
   meeting_id: string

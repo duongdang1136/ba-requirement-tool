@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { meetingsApi, transcriptApi, exportApi } from '../../api'
-import type { TranscriptSegment, ProcessingStatus } from '../../types'
+import type { TranscriptSegment, ProcessingStatus, Speaker } from '../../types'
 
 interface Props {
   meetingId: string
@@ -18,6 +18,8 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
   const [segments, setSegments] = useState<TranscriptSegment[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
+  const [speakers, setSpeakers] = useState<Speaker[]>([])
+  const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -40,7 +42,10 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
 
   async function loadTranscript() {
     const segs = await transcriptApi.get(meetingId)
+    const speakerList = await transcriptApi.speakers(meetingId)
     setSegments(segs)
+    setSpeakers(speakerList)
+    setSpeakerNames(Object.fromEntries(speakerList.map(s => [s.speaker_label, s.display_name])))
   }
 
   function startEdit(seg: TranscriptSegment) {
@@ -75,9 +80,23 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
     setLoading(true)
     await transcriptApi.clear(meetingId)
     setSegments([])
+    setSpeakers([])
+    setSpeakerNames({})
     setEditingId(null)
     setEditText('')
     setLoading(false)
+  }
+
+  async function saveSpeakerName(speakerLabel: string) {
+    setLoading(true)
+    const displayName = speakerNames[speakerLabel]?.trim() ?? ''
+    await transcriptApi.renameSpeaker(meetingId, speakerLabel, displayName)
+    setSpeakers(prev => prev.map(s => s.speaker_label === speakerLabel ? { ...s, display_name: displayName } : s))
+    setLoading(false)
+  }
+
+  function speakerDisplay(label: string) {
+    return speakerNames[label]?.trim() || label
   }
 
   if (!status) {
@@ -117,6 +136,28 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
         </div>
       )}
 
+      {status.status === 'completed' && speakers.length > 0 && (
+        <div style={{ ...panelStyle, marginBottom: 24 }}>
+          <div style={{ fontWeight: 600, marginBottom: 12 }}>Speakers</div>
+          <div style={{ display: 'grid', gap: 10 }}>
+            {speakers.map(speaker => (
+              <div key={speaker.speaker_label} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span style={{ width: 90, fontSize: 12, color: '#555' }}>{speaker.speaker_label}</span>
+                <input
+                  value={speakerNames[speaker.speaker_label] ?? ''}
+                  onChange={e => setSpeakerNames(prev => ({ ...prev, [speaker.speaker_label]: e.target.value }))}
+                  placeholder="Client, BA, PM..."
+                  style={inputStyle}
+                />
+                <button onClick={() => saveSpeakerName(speaker.speaker_label)} disabled={loading} style={btnOutline}>
+                  Rename
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Transcript */}
       <div>
         {segments.map(seg => (
@@ -130,7 +171,7 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
               <span>{formatTime(seg.start)} – {formatTime(seg.end)}</span>
               <br />
               <span style={{ fontSize: 11, background: '#f0f0f0', borderRadius: 4, padding: '2px 6px' }}>
-                {seg.speaker_label}
+                {speakerDisplay(seg.speaker_label)}
               </span>
             </div>
             <div style={{ flex: 1 }}>
@@ -198,5 +239,20 @@ const btnDanger: React.CSSProperties = {
   border: 'none',
   borderRadius: 6,
   cursor: 'pointer',
+  fontSize: 13,
+}
+
+const panelStyle: React.CSSProperties = {
+  background: 'white',
+  border: '1px solid #e0e0e0',
+  borderRadius: 8,
+  padding: 16,
+}
+
+const inputStyle: React.CSSProperties = {
+  flex: 1,
+  padding: '7px 10px',
+  border: '1px solid #ccc',
+  borderRadius: 6,
   fontSize: 13,
 }
