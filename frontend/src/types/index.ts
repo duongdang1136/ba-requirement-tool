@@ -37,6 +37,7 @@ export interface TranscriptSegment {
   end: number
   speaker_label: string
   original_text: string
+  refined_text: string | null
   edited_text: string | null
   display_text: string
   sequence: number
@@ -46,6 +47,12 @@ export interface TranscriptSegment {
 export interface Speaker {
   speaker_label: string
   display_name: string
+}
+
+export interface AISettings {
+  provider: string
+  model: string
+  has_api_key: boolean
 }
 
 export interface RequirementCandidate {

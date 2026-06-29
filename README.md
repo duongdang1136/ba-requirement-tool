@@ -40,6 +40,7 @@ To stop the app, press `Ctrl+C` in the terminal running `npm run dev`.
 - ⚙️ Auto-process: normalize audio → detect speech → transcribe with local speech-to-text
 - 👥 Detect speaker turns and label transcript segments
 - 🏷 Rename speaker labels, for example `SPEAKER_00` → `Client`
+- ✨ Refine transcript text with the user's own Gemini API key
 - 📝 Review transcript by timestamp
 - ✏️ Edit transcript text (preserves original + traceability)
 - 💾 Export reviewed transcript to **Markdown** or **TXT**
@@ -110,6 +111,32 @@ Local runtime data is stored in:
 - `models/`
 
 These are ignored by git and should not be committed.
+
+## Gemini Transcript Refinement
+
+The app can refine raw ASR transcript text with Gemini. This is optional and uses the user's own Gemini API key.
+
+How to use:
+
+```text
+1. Open a processed meeting transcript.
+2. In the Gemini panel, paste your Gemini API key.
+3. Keep the default model or set another Gemini model.
+4. Click Save Gemini Settings.
+5. Click Refine with Gemini for the whole transcript, or Refine on one segment.
+```
+
+The Gemini API key is stored locally in SQLite. It is not committed to git because local database files are ignored.
+
+Refinement keeps three transcript layers:
+
+```text
+original_text = raw ASR from sherpa-onnx
+refined_text  = Gemini rewrite for readability
+edited_text   = final BA manual edit
+```
+
+Export uses `edited_text`, then `refined_text`, then `original_text` as fallback.
 
 ## Optional Docker Usage
 

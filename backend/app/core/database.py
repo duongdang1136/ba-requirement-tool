@@ -23,5 +23,16 @@ def get_db():
 
 
 def init_db():
-    from app.models import project, meeting, transcript, requirement  # noqa
+    from app.models import project, meeting, transcript, requirement, settings  # noqa
     Base.metadata.create_all(bind=engine)
+    _run_lightweight_migrations()
+
+
+def _run_lightweight_migrations():
+    if "sqlite" not in settings.database_url:
+        return
+
+    with engine.begin() as conn:
+        columns = [row[1] for row in conn.exec_driver_sql("PRAGMA table_info(transcript_segments)").fetchall()]
+        if "refined_text" not in columns:
+            conn.exec_driver_sql("ALTER TABLE transcript_segments ADD COLUMN refined_text TEXT")
