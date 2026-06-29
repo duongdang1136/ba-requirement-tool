@@ -26,11 +26,6 @@ class RefineResult(BaseModel):
     refined_count: int
 
 
-class TestConnectionOut(BaseModel):
-    ok: bool
-    message: str
-
-
 def _get_or_create_settings(db: Session) -> AISettings:
     settings = db.query(AISettings).filter(AISettings.provider == "gemini").first()
     if settings:
@@ -68,28 +63,6 @@ def update_ai_settings(payload: AISettingsUpdate, db: Session = Depends(get_db))
     )
 
 
-@router.post("/test", response_model=TestConnectionOut)
-def test_ai_settings(db: Session = Depends(get_db)):
-    settings = _get_or_create_settings(db)
-    if not settings.api_key.strip():
-        raise HTTPException(status_code=400, detail="Gemini API key is not configured")
-
-    try:
-        refined = refine_vietnamese_transcript(
-            api_key=settings.api_key,
-            model=settings.model,
-            text="khách hàng cần luồng duyệt hóa đơn trên mười triệu",
-            speaker="SPEAKER_00",
-        )
-        return TestConnectionOut(ok=True, message=f"Connected. Sample: {refined}")
-    except GeminiRefineError as e:
-        print(f"[Gemini test error] {e}", flush=True)
-        raise HTTPException(status_code=502, detail=f"Gemini connection failed: {e}") from e
-    except Exception as e:
-        print(f"[Gemini unexpected test error] {e}", flush=True)
-        raise HTTPException(status_code=500, detail=f"Gemini test failed unexpectedly: {e}") from e
-
-
 @router.post("/transcript-segments/{segment_id}/refine")
 def refine_segment(segment_id: str, db: Session = Depends(get_db)):
     settings = _get_or_create_settings(db)
@@ -108,10 +81,10 @@ def refine_segment(segment_id: str, db: Session = Depends(get_db)):
             speaker=segment.speaker_label,
         )
     except GeminiRefineError as e:
-        print(f"[Gemini refine error] {e}", flush=True)
+        print(f"[Gemini refine error] {e}")
         raise HTTPException(status_code=502, detail=f"Gemini refine failed: {e}") from e
     except Exception as e:
-        print(f"[Gemini unexpected error] {e}", flush=True)
+        print(f"[Gemini unexpected error] {e}")
         raise HTTPException(status_code=500, detail=f"Gemini refine failed unexpectedly: {e}") from e
 
     db.commit()
@@ -148,11 +121,11 @@ def refine_meeting_transcript(meeting_id: str, db: Session = Depends(get_db)):
             refined_count += 1
         except GeminiRefineError as e:
             db.rollback()
-            print(f"[Gemini refine error] {e}", flush=True)
+            print(f"[Gemini refine error] {e}")
             raise HTTPException(status_code=502, detail=f"Gemini refine failed: {e}") from e
         except Exception as e:
             db.rollback()
-            print(f"[Gemini unexpected error] {e}", flush=True)
+            print(f"[Gemini unexpected error] {e}")
             raise HTTPException(status_code=500, detail=f"Gemini refine failed unexpectedly: {e}") from e
 
     db.commit()

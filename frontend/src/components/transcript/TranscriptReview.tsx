@@ -25,7 +25,6 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
   const [geminiModel, setGeminiModel] = useState('gemini-2.0-flash')
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
-  const [successMessage, setSuccessMessage] = useState('')
 
   useEffect(() => {
     loadStatus()
@@ -109,27 +108,11 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
 
   async function saveGeminiSettings() {
     setErrorMessage('')
-    setSuccessMessage('')
     setLoading(true)
     try {
       const settings = await aiSettingsApi.update({ api_key: geminiKey || undefined, model: geminiModel })
       setAiSettings(settings)
       setGeminiKey('')
-      setSuccessMessage(settings.has_api_key ? 'Gemini settings saved.' : 'Gemini model saved. API key is not configured yet.')
-    } catch (error) {
-      setErrorMessage(readApiError(error))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function testGeminiConnection() {
-    setErrorMessage('')
-    setSuccessMessage('')
-    setLoading(true)
-    try {
-      const result = await aiSettingsApi.test()
-      setSuccessMessage(result.message)
     } catch (error) {
       setErrorMessage(readApiError(error))
     } finally {
@@ -144,12 +127,10 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
     }
 
     setErrorMessage('')
-    setSuccessMessage('')
     setLoading(true)
     try {
-      const result = await aiSettingsApi.refineMeeting(meetingId)
+      await aiSettingsApi.refineMeeting(meetingId)
       await loadTranscript()
-      setSuccessMessage(`Refined ${result.refined_count} transcript segments.`)
     } catch (error) {
       setErrorMessage(readApiError(error))
     } finally {
@@ -164,12 +145,10 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
     }
 
     setErrorMessage('')
-    setSuccessMessage('')
     setLoading(true)
     try {
       const updated = await aiSettingsApi.refineSegment(segmentId)
       setSegments(prev => prev.map(s => s.id === segmentId ? updated : s))
-      setSuccessMessage('Segment refined.')
     } catch (error) {
       setErrorMessage(readApiError(error))
     } finally {
@@ -240,15 +219,7 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
           />
           <div>
             <button onClick={saveGeminiSettings} disabled={loading} style={btnOutline}>Save Gemini Settings</button>
-            <button onClick={testGeminiConnection} disabled={loading || !aiSettings?.has_api_key} style={{ ...btnOutline, marginLeft: 8 }}>
-              Test Connection
-            </button>
           </div>
-          {successMessage && (
-            <div style={{ color: '#137333', fontSize: 13, lineHeight: 1.5 }}>
-              {successMessage}
-            </div>
-          )}
           {errorMessage && (
             <div style={{ color: '#b3261e', fontSize: 13, lineHeight: 1.5 }}>
               {errorMessage}
