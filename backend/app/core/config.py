@@ -19,8 +19,8 @@ class Settings(BaseSettings):
     local_llm_url: str = "http://localhost:11434"
 
     # sherpa-onnx model
-    asr_model_dir: str = "./models/asr"
-    asr_language: str = "en"
+    asr_model_dir: str = "./models/asr/sherpa-onnx-whisper-small"
+    asr_language: str = "vi"
 
     # File limits
     max_upload_size_mb: int = 500
