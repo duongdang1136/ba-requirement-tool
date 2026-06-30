@@ -80,7 +80,7 @@ if (
 from pathlib import Path
 from urllib.request import urlretrieve
 urlretrieve(${JSON.stringify(modelUrl)}, ${JSON.stringify(archivePath)})
-`])
+`], { shell: false })
 
   console.log('Extracting ASR model...')
   run(venvPython, ['-c', `
@@ -92,7 +92,7 @@ target.mkdir(parents=True, exist_ok=True)
 with tarfile.open(archive, 'r:bz2') as f:
     f.extractall(target)
 archive.unlink()
-`])
+`], { shell: false })
 }
 
 mkdirSync(join(root, 'models', 'vad'), { recursive: true })
@@ -103,7 +103,7 @@ if (existsSync(vadModelPath)) {
   run(venvPython, ['-c', `
 from urllib.request import urlretrieve
 urlretrieve(${JSON.stringify(vadModelUrl)}, ${JSON.stringify(vadModelPath)})
-`])
+`], { shell: false })
 }
 
 mkdirSync(diarizationDir, { recursive: true })
@@ -114,7 +114,7 @@ if (existsSync(join(segmentationDir, 'model.onnx'))) {
   run(venvPython, ['-c', `
 from urllib.request import urlretrieve
 urlretrieve(${JSON.stringify(segmentationUrl)}, ${JSON.stringify(segmentationArchive)})
-`])
+`], { shell: false })
   console.log('Extracting speaker segmentation model...')
   run(venvPython, ['-c', `
 import tarfile
@@ -124,7 +124,7 @@ target = Path(${JSON.stringify(diarizationDir)})
 with tarfile.open(archive, 'r:bz2') as f:
     f.extractall(target)
 archive.unlink()
-`])
+`], { shell: false })
 }
 
 if (existsSync(embeddingModelPath)) {
@@ -134,7 +134,7 @@ if (existsSync(embeddingModelPath)) {
   run(venvPython, ['-c', `
 from urllib.request import urlretrieve
 urlretrieve(${JSON.stringify(embeddingModelUrl)}, ${JSON.stringify(embeddingModelPath)})
-`])
+`], { shell: false })
 }
 
 console.log('')

@@ -14,8 +14,14 @@ if (!existsSync(venvPython)) {
   process.exit(1)
 }
 
+function quoteArg(value) {
+  return `"${String(value).replaceAll('"', '\\"')}"`
+}
+
+const concurrentlyBin = join(root, 'node_modules', 'concurrently', 'dist', 'bin', 'concurrently.js')
 const backendCommand = [
-  JSON.stringify(venvPython),
+  isWindows ? `cd /d ${quoteArg(join(root, 'backend'))} &&` : `cd ${quoteArg(join(root, 'backend'))} &&`,
+  quoteArg(venvPython),
   '-m',
   'uvicorn',
   'app.main:app',
@@ -26,12 +32,12 @@ const backendCommand = [
   '--reload',
 ].join(' ')
 
-const frontendCommand = 'npm --prefix frontend run dev'
+const frontendCommand = `${isWindows ? 'npm.cmd' : 'npm'} --prefix ${quoteArg(join(root, 'frontend'))} run dev`
 
 const result = spawnSync(
-  isWindows ? 'npx.cmd' : 'npx',
+  process.execPath,
   [
-    'concurrently',
+    concurrentlyBin,
     '--kill-others-on-fail',
     '--names',
     'backend,frontend',
@@ -43,7 +49,7 @@ const result = spawnSync(
   {
     cwd: root,
     stdio: 'inherit',
-    shell: isWindows,
+    shell: false,
     env: {
       ...process.env,
       DATABASE_URL: process.env.DATABASE_URL ?? 'sqlite:///./ba_tool.db',
@@ -58,5 +64,9 @@ const result = spawnSync(
     },
   },
 )
+
+if (result.error) {
+  console.error(result.error.message)
+}
 
 process.exit(result.status ?? 1)
