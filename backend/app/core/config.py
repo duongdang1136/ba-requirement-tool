@@ -29,10 +29,15 @@ class Settings(BaseSettings):
     diarization_segmentation_model: str = str(REPO_ROOT / "models" / "diarization" / "sherpa-onnx-pyannote-segmentation-3-0" / "model.onnx")
     diarization_embedding_model: str = str(REPO_ROOT / "models" / "diarization" / "3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx")
     diarization_cluster_threshold: float = 0.5
+    diarization_chunk_minutes: int = 25
 
     # File limits
-    max_upload_size_mb: int = 500
+    max_upload_size_mb: int = 1024
     allowed_extensions: List[str] = [".mp3", ".wav", ".m4a", ".mp4", ".webm", ".ogg"]
+    asr_num_threads: int = 8
+
+    worker_poll_interval_seconds: float = 2.0
+    job_timeout_minutes: int = 240
 
     class Config:
         env_file = ".env"

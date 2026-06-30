@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
-import { meetingsApi } from '../api'
+import React, { useEffect, useState } from 'react'
+import { appConfigApi, meetingsApi } from '../api'
+import type { ClientConfig } from '../types'
 
 interface Props {
   projectId: string
@@ -7,24 +8,35 @@ interface Props {
 }
 
 export default function UploadPage({ projectId, onMeetingCreated }: Props) {
+  const fallbackConfig: ClientConfig = {
+    allowed_extensions: ['.mp3', '.wav', '.m4a', '.mp4', '.webm', '.ogg'],
+    max_upload_size_mb: 1024,
+  }
   const [title, setTitle] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [step, setStep] = useState<'form' | 'uploading' | 'processing'>('form')
   const [error, setError] = useState('')
   const [progress, setProgress] = useState('')
+  const [config, setConfig] = useState<ClientConfig>(fallbackConfig)
+  const [speakerCount, setSpeakerCount] = useState('')
+  const [diarizationThreshold, setDiarizationThreshold] = useState('')
 
-  const ALLOWED = ['.mp3', '.wav', '.m4a', '.mp4', '.webm', '.ogg']
+  useEffect(() => {
+    appConfigApi.client().then(setConfig).catch(() => {
+      setConfig(fallbackConfig)
+    })
+  }, [])
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
     if (!f) return
     const ext = '.' + f.name.split('.').pop()?.toLowerCase()
-    if (!ALLOWED.includes(ext)) {
-      setError(`Unsupported file type. Allowed: ${ALLOWED.join(', ')}`)
+    if (!config.allowed_extensions.includes(ext)) {
+      setError(`Unsupported file type. Allowed: ${config.allowed_extensions.join(', ')}`)
       return
     }
-    if (f.size > 500 * 1024 * 1024) {
-      setError('File exceeds 500MB limit')
+    if (f.size > config.max_upload_size_mb * 1024 * 1024) {
+      setError(`File exceeds ${config.max_upload_size_mb}MB limit`)
       return
     }
     setError('')
@@ -46,7 +58,10 @@ export default function UploadPage({ projectId, onMeetingCreated }: Props) {
       setProgress('Uploading file...')
       await meetingsApi.uploadMedia(meeting.id, file)
       setProgress('Starting processing...')
-      await meetingsApi.process(meeting.id)
+      await meetingsApi.process(meeting.id, {
+        diarization_num_speakers: speakerCount ? Number(speakerCount) : undefined,
+        diarization_cluster_threshold: diarizationThreshold ? Number(diarizationThreshold) : undefined,
+      })
       setStep('processing')
       onMeetingCreated(meeting.id)
     } catch (err: any) {
@@ -75,7 +90,7 @@ export default function UploadPage({ projectId, onMeetingCreated }: Props) {
           <label style={labelStyle}>Audio / Video File</label>
           <input
             type="file"
-            accept=".mp3,.wav,.m4a,.mp4,.webm,.ogg"
+            accept={config.allowed_extensions.join(',')}
             onChange={handleFileChange}
             style={{ marginBottom: 16, display: 'block' }}
           />
@@ -84,6 +99,33 @@ export default function UploadPage({ projectId, onMeetingCreated }: Props) {
               ✓ {file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)
             </div>
           )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+            <div>
+              <label style={labelStyle}>Speakers</label>
+              <input
+                type="number"
+                min="1"
+                value={speakerCount}
+                onChange={e => setSpeakerCount(e.target.value)}
+                placeholder="Auto"
+                style={{ ...inputStyle, marginBottom: 0 }}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Cluster Threshold</label>
+              <input
+                type="number"
+                min="0"
+                max="1"
+                step="0.05"
+                value={diarizationThreshold}
+                onChange={e => setDiarizationThreshold(e.target.value)}
+                placeholder="0.5"
+                style={{ ...inputStyle, marginBottom: 0 }}
+              />
+            </div>
+          </div>
 
           {error && (
             <div style={{ color: '#d93025', marginBottom: 12, fontSize: 13 }}>{error}</div>

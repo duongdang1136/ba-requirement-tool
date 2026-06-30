@@ -5,7 +5,8 @@
   "scripts": {
     "setup": "node scripts/setup.mjs",
     "dev": "node scripts/dev.mjs",
-    "build": "npm --prefix frontend run build"
+    "build": "npm --prefix frontend run build",
+    "cleanup": "node scripts/cleanup.mjs"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

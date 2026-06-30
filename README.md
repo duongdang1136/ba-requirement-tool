@@ -102,6 +102,7 @@ http://localhost:5173
 ```
 
 The frontend runs on port `5173`. The backend runs on port `8099`.
+`npm run dev` also starts a background worker process. The API enqueues processing jobs, and the worker runs audio processing outside the web server process.
 
 Local runtime data is stored in:
 
@@ -139,6 +140,9 @@ source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8099
 
+# Worker (new terminal, same backend venv)
+python -m app.worker
+
 # Frontend (new terminal)
 cd frontend
 npm install
@@ -146,6 +150,20 @@ npm run dev
 ```
 
 Open → http://localhost:5173
+
+### Cleanup
+
+Build and test artifacts can be cleaned with:
+
+```bash
+npm run cleanup
+```
+
+If local npm/pip/temp caches are filling the machine, run:
+
+```bash
+npm run cleanup -- --system-cache
+```
 
 ### Speech-to-Text (sherpa-onnx)
 
@@ -200,11 +218,15 @@ cp backend/.env.example backend/.env
 | `UPLOAD_DIR` | `./uploads` | Where files are stored |
 | `ASR_MODEL_DIR` | `../models/asr/sherpa-onnx-whisper-small` | sherpa-onnx model path |
 | `ASR_LANGUAGE` | `vi` | Primary meeting language |
+| `ASR_NUM_THREADS` | `8` | CPU threads used by ASR |
 | `VAD_MODEL_PATH` | `../models/vad/silero_vad.onnx` | Silero VAD model |
 | `DIARIZATION_SEGMENTATION_MODEL` | `../models/diarization/sherpa-onnx-pyannote-segmentation-3-0/model.onnx` | Speaker segmentation model |
 | `DIARIZATION_EMBEDDING_MODEL` | `../models/diarization/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx` | Speaker embedding model |
 | `DIARIZATION_CLUSTER_THRESHOLD` | `0.5` | Speaker clustering threshold |
-| `MAX_UPLOAD_SIZE_MB` | `500` | File size limit |
+| `DIARIZATION_CHUNK_MINUTES` | `25` | Minutes per diarization chunk |
+| `MAX_UPLOAD_SIZE_MB` | `1024` | File size limit |
+| `WORKER_POLL_INTERVAL_SECONDS` | `2.0` | Delay between queue polls |
+| `JOB_TIMEOUT_MINUTES` | `240` | Mark running jobs failed after this many minutes |
 | `LLM_PROVIDER` | `openai` | For Phase 2 extraction |
 | `OPENAI_API_KEY` | `` | OpenAI key (Phase 2) |
 

@@ -40,6 +40,7 @@ class ProcessingJob(Base):
     step: Mapped[str] = mapped_column(String(100))  # normalize | vad | asr | diarize | merge | extract
     status: Mapped[str] = mapped_column(String(50), default="queued")  # queued | running | completed | failed
     progress: Mapped[int] = mapped_column(default=0)  # 0-100
+    job_payload: Mapped[str] = mapped_column(Text, default="{}")
     error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)

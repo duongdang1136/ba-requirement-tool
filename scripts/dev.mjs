@@ -32,6 +32,13 @@ const backendCommand = [
   '--reload',
 ].join(' ')
 
+const workerCommand = [
+  isWindows ? `cd /d ${quoteArg(join(root, 'backend'))} &&` : `cd ${quoteArg(join(root, 'backend'))} &&`,
+  quoteArg(venvPython),
+  '-m',
+  'app.worker',
+].join(' ')
+
 const frontendCommand = `${isWindows ? 'npm.cmd' : 'npm'} --prefix ${quoteArg(join(root, 'frontend'))} run dev`
 
 const result = spawnSync(
@@ -40,10 +47,11 @@ const result = spawnSync(
     concurrentlyBin,
     '--kill-others-on-fail',
     '--names',
-    'backend,frontend',
+    'backend,worker,frontend',
     '--prefix-colors',
-    'blue,green',
-    `cd backend && ${backendCommand}`,
+    'blue,magenta,green',
+    backendCommand,
+    workerCommand,
     frontendCommand,
   ],
   {
@@ -57,9 +65,13 @@ const result = spawnSync(
       MODELS_DIR: process.env.MODELS_DIR ?? '../models',
       ASR_MODEL_DIR: process.env.ASR_MODEL_DIR ?? '../models/asr/sherpa-onnx-whisper-small',
       ASR_LANGUAGE: process.env.ASR_LANGUAGE ?? 'vi',
+      ASR_NUM_THREADS: process.env.ASR_NUM_THREADS ?? '8',
       VAD_MODEL_PATH: process.env.VAD_MODEL_PATH ?? '../models/vad/silero_vad.onnx',
       DIARIZATION_SEGMENTATION_MODEL: process.env.DIARIZATION_SEGMENTATION_MODEL ?? '../models/diarization/sherpa-onnx-pyannote-segmentation-3-0/model.onnx',
       DIARIZATION_EMBEDDING_MODEL: process.env.DIARIZATION_EMBEDDING_MODEL ?? '../models/diarization/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx',
+      DIARIZATION_CHUNK_MINUTES: process.env.DIARIZATION_CHUNK_MINUTES ?? '25',
+      WORKER_POLL_INTERVAL_SECONDS: process.env.WORKER_POLL_INTERVAL_SECONDS ?? '2.0',
+      JOB_TIMEOUT_MINUTES: process.env.JOB_TIMEOUT_MINUTES ?? '240',
       CORS_ORIGINS: process.env.CORS_ORIGINS ?? '["http://localhost:5173","http://localhost:3000"]',
     },
   },

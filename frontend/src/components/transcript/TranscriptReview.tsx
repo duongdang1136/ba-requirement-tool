@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react'
-import { meetingsApi, transcriptApi, exportApi } from '../../api'
-import type { TranscriptSegment, ProcessingStatus, Speaker } from '../../types'
+import React, { useEffect, useState } from 'react'
+import { exportApi, meetingsApi, transcriptApi } from '../../api'
+import type { ProcessingStatus, Speaker, TranscriptSegment } from '../../types'
 
 interface Props {
   meetingId: string
@@ -21,6 +21,8 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
   const [speakers, setSpeakers] = useState<Speaker[]>([])
   const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
+  const [speakerCount, setSpeakerCount] = useState('')
+  const [diarizationThreshold, setDiarizationThreshold] = useState('')
 
   useEffect(() => {
     loadStatus()
@@ -33,7 +35,7 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
       if (s.status === 'completed') {
         loadTranscript()
       } else if (s.status === 'running' || s.status === 'queued') {
-        setTimeout(loadStatus, 2000) // poll
+        setTimeout(loadStatus, 2000)
       }
     } catch {
       // No job yet
@@ -87,6 +89,16 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
     setLoading(false)
   }
 
+  async function rerunDiarization() {
+    setLoading(true)
+    await meetingsApi.rerunDiarization(meetingId, {
+      diarization_num_speakers: speakerCount ? Number(speakerCount) : undefined,
+      diarization_cluster_threshold: diarizationThreshold ? Number(diarizationThreshold) : undefined,
+    })
+    setLoading(false)
+    loadStatus()
+  }
+
   async function saveSpeakerName(speakerLabel: string) {
     setLoading(true)
     const displayName = speakerNames[speakerLabel]?.trim() ?? ''
@@ -98,6 +110,22 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
   function speakerDisplay(label: string) {
     return speakerNames[label]?.trim() || label
   }
+
+  const hasProcessingWarning = status?.status === 'completed' && Boolean(status.error)
+  const statusBackground = hasProcessingWarning
+    ? '#fff3cd'
+    : status?.status === 'completed'
+      ? '#e6f4ea'
+      : status?.status === 'failed'
+        ? '#fce8e6'
+        : '#fff3cd'
+  const statusBorder = hasProcessingWarning
+    ? '#fbbc04'
+    : status?.status === 'completed'
+      ? '#34a853'
+      : status?.status === 'failed'
+        ? '#ea4335'
+        : '#fbbc04'
 
   if (!status) {
     return (
@@ -112,26 +140,47 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
     <div style={{ padding: 24, maxWidth: 900 }}>
       <h2 style={{ marginBottom: 8 }}>{meetingTitle}</h2>
 
-      {/* Status bar */}
       <div style={{
         padding: '8px 16px',
         borderRadius: 8,
         marginBottom: 24,
-        background: status.status === 'completed' ? '#e6f4ea' : status.status === 'failed' ? '#fce8e6' : '#fff3cd',
-        border: `1px solid ${status.status === 'completed' ? '#34a853' : status.status === 'failed' ? '#ea4335' : '#fbbc04'}`,
+        background: statusBackground,
+        border: `1px solid ${statusBorder}`,
       }}>
-        <strong>Status:</strong> {status.step} — {status.status}
+        <strong>Status:</strong> {status.step} - {status.status}
         {status.progress > 0 && status.progress < 100 && (
           <span> ({status.progress}%)</span>
         )}
-        {status.error && <span style={{ color: 'red' }}> Error: {status.error}</span>}
+        {status.error && (
+          <div style={{ color: status.status === 'completed' ? '#8a5a00' : 'red', marginTop: 4 }}>
+            {status.status === 'completed' ? 'Warning' : 'Error'}: {status.error}
+          </div>
+        )}
       </div>
 
-      {/* Export buttons */}
       {status.status === 'completed' && segments.length > 0 && (
-        <div style={{ marginBottom: 24, display: 'flex', gap: 8 }}>
+        <div style={{ marginBottom: 24, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <button onClick={() => downloadExport('markdown')} style={btnStyle}>Export Markdown</button>
           <button onClick={() => downloadExport('txt')} style={btnStyle}>Export TXT</button>
+          <input
+            type="number"
+            min="1"
+            value={speakerCount}
+            onChange={e => setSpeakerCount(e.target.value)}
+            placeholder="Speakers"
+            style={smallInputStyle}
+          />
+          <input
+            type="number"
+            min="0"
+            max="1"
+            step="0.05"
+            value={diarizationThreshold}
+            onChange={e => setDiarizationThreshold(e.target.value)}
+            placeholder="Threshold"
+            style={smallInputStyle}
+          />
+          <button onClick={rerunDiarization} disabled={loading} style={btnOutline}>Re-run Diarization</button>
           <button onClick={clearTranscript} disabled={loading} style={btnDanger}>Clear Transcript</button>
         </div>
       )}
@@ -158,7 +207,6 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
         </div>
       )}
 
-      {/* Transcript */}
       <div>
         {segments.map(seg => (
           <div key={seg.id} style={{
@@ -168,7 +216,7 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
             borderBottom: '1px solid #eee',
           }}>
             <div style={{ minWidth: 120, color: '#666', fontSize: 13, paddingTop: 2 }}>
-              <span>{formatTime(seg.start)} – {formatTime(seg.end)}</span>
+              <span>{formatTime(seg.start)} - {formatTime(seg.end)}</span>
               <br />
               <span style={{ fontSize: 11, background: '#f0f0f0', borderRadius: 4, padding: '2px 6px' }}>
                 {speakerDisplay(seg.speaker_label)}
@@ -193,7 +241,7 @@ export default function TranscriptReview({ meetingId, meetingTitle }: Props) {
                   <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6 }}>
                     {seg.display_text}
                     {seg.edited_text && (
-                      <span style={{ marginLeft: 8, fontSize: 11, color: '#34a853' }}>✏ edited</span>
+                      <span style={{ marginLeft: 8, fontSize: 11, color: '#34a853' }}>edited</span>
                     )}
                   </p>
                   <button
@@ -251,6 +299,14 @@ const panelStyle: React.CSSProperties = {
 
 const inputStyle: React.CSSProperties = {
   flex: 1,
+  padding: '7px 10px',
+  border: '1px solid #ccc',
+  borderRadius: 6,
+  fontSize: 13,
+}
+
+const smallInputStyle: React.CSSProperties = {
+  width: 96,
   padding: '7px 10px',
   border: '1px solid #ccc',
   borderRadius: 6,

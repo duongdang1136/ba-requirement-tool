@@ -1,7 +1,20 @@
 import api from './client'
-import type { Project, Meeting, ProcessingStatus, TranscriptSegment, Speaker, RequirementCandidate, Requirement } from '../types'
+import type {
+  ClientConfig,
+  DiarizationOptions,
+  Meeting,
+  ProcessingStatus,
+  Project,
+  Requirement,
+  RequirementCandidate,
+  Speaker,
+  TranscriptSegment,
+} from '../types'
 
-// Projects
+export const appConfigApi = {
+  client: () => api.get<ClientConfig>('/config/client').then(r => r.data),
+}
+
 export const projectsApi = {
   list: () => api.get<Project[]>('/projects').then(r => r.data),
   get: (id: string) => api.get<Project>(`/projects/${id}`).then(r => r.data),
@@ -9,7 +22,6 @@ export const projectsApi = {
     api.post<Project>('/projects', data).then(r => r.data),
 }
 
-// Meetings
 export const meetingsApi = {
   list: (projectId: string) => api.get<Meeting[]>(`/meetings/project/${projectId}`).then(r => r.data),
   get: (id: string) => api.get<Meeting>(`/meetings/${id}`).then(r => r.data),
@@ -20,11 +32,13 @@ export const meetingsApi = {
     form.append('file', file)
     return api.post(`/meetings/${meetingId}/media`, form).then(r => r.data)
   },
-  process: (meetingId: string) => api.post(`/meetings/${meetingId}/process`).then(r => r.data),
+  process: (meetingId: string, options?: DiarizationOptions) =>
+    api.post(`/meetings/${meetingId}/process`, options ?? {}).then(r => r.data),
+  rerunDiarization: (meetingId: string, options?: DiarizationOptions) =>
+    api.post(`/meetings/${meetingId}/diarization`, options ?? {}).then(r => r.data),
   status: (meetingId: string) => api.get<ProcessingStatus>(`/meetings/${meetingId}/status`).then(r => r.data),
 }
 
-// Transcript
 export const transcriptApi = {
   get: (meetingId: string) =>
     api.get<TranscriptSegment[]>(`/transcript-segments/meeting/${meetingId}`).then(r => r.data),
@@ -38,7 +52,6 @@ export const transcriptApi = {
     api.post(`/transcript-segments/meeting/${meetingId}/rename-speaker`, { speaker_label, display_name }).then(r => r.data),
 }
 
-// Requirements
 export const requirementsApi = {
   listCandidates: (meetingId: string) =>
     api.get<RequirementCandidate[]>(`/requirements/candidates/meeting/${meetingId}`).then(r => r.data),
@@ -50,7 +63,6 @@ export const requirementsApi = {
     api.get<Requirement[]>(`/requirements/project/${projectId}`).then(r => r.data),
 }
 
-// Export
 export const exportApi = {
   transcriptMarkdown: (meetingId: string) =>
     api.get(`/export/meeting/${meetingId}/transcript/markdown`, { responseType: 'blob' }).then(r => r.data),

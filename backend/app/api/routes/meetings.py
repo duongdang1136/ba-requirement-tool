@@ -1,17 +1,16 @@
-import os
+import json
 import shutil
-import threading
+from datetime import date, datetime
 from pathlib import Path
 from typing import List, Optional
-from datetime import datetime, date
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-from app.core.database import get_db
 from app.core.config import settings
-from app.models.meeting import Meeting, MediaFile, ProcessingJob
+from app.core.database import get_db
+from app.models.meeting import MediaFile, Meeting, ProcessingJob
 from app.models.project import Project
 
 router = APIRouter()
@@ -47,6 +46,27 @@ class ProcessingStatusOut(BaseModel):
     error: Optional[str]
     started_at: Optional[datetime]
     finished_at: Optional[datetime]
+
+
+class DiarizationOptions(BaseModel):
+    diarization_num_speakers: Optional[int] = None
+    diarization_cluster_threshold: Optional[float] = None
+
+    def normalized_num_speakers(self) -> Optional[int]:
+        if self.diarization_num_speakers is None or self.diarization_num_speakers <= 0:
+            return None
+        return self.diarization_num_speakers
+
+    def normalized_threshold(self) -> Optional[float]:
+        if self.diarization_cluster_threshold is None:
+            return None
+        return min(max(self.diarization_cluster_threshold, 0.0), 1.0)
+
+    def normalized_payload(self) -> dict:
+        return {
+            "diarization_num_speakers": self.normalized_num_speakers(),
+            "diarization_cluster_threshold": self.normalized_threshold(),
+        }
 
 
 @router.post("", response_model=MeetingOut, status_code=201)
@@ -114,20 +134,46 @@ async def upload_media(
 
 
 @router.post("/{meeting_id}/process")
-def process_meeting(meeting_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    """Kick off the full processing pipeline: normalize → ASR → merge."""
-    from app.services.audio.pipeline import run_pipeline
-
+def process_meeting(
+    meeting_id: str,
+    payload: Optional[DiarizationOptions] = None,
+    db: Session = Depends(get_db),
+):
     meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
 
-    job = ProcessingJob(meeting_id=meeting_id, step="normalize", status="queued")
+    job = ProcessingJob(
+        meeting_id=meeting_id,
+        step="pipeline",
+        status="queued",
+        job_payload=json.dumps(payload.normalized_payload() if payload else {}),
+    )
     db.add(job)
     db.commit()
     db.refresh(job)
+    return {"job_id": job.id, "status": "queued"}
 
-    background_tasks.add_task(run_pipeline, meeting_id, job.id)
+
+@router.post("/{meeting_id}/diarization")
+def enqueue_diarization(
+    meeting_id: str,
+    payload: Optional[DiarizationOptions] = None,
+    db: Session = Depends(get_db),
+):
+    meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    job = ProcessingJob(
+        meeting_id=meeting_id,
+        step="diarize",
+        status="queued",
+        job_payload=json.dumps(payload.normalized_payload() if payload else {}),
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
     return {"job_id": job.id, "status": "queued"}
 
 

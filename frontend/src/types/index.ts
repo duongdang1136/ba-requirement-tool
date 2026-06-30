@@ -48,6 +48,16 @@ export interface Speaker {
   display_name: string
 }
 
+export interface ClientConfig {
+  max_upload_size_mb: number
+  allowed_extensions: string[]
+}
+
+export interface DiarizationOptions {
+  diarization_num_speakers?: number
+  diarization_cluster_threshold?: number
+}
+
 export interface RequirementCandidate {
   id: string
   meeting_id: string
