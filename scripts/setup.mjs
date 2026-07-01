@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -21,6 +21,8 @@ const segmentationArchive = join(diarizationDir, 'sherpa-onnx-pyannote-segmentat
 const segmentationUrl = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2'
 const embeddingModelPath = join(diarizationDir, '3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx')
 const embeddingModelUrl = 'https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx'
+const envExamplePath = join(root, 'backend', '.env.example')
+const envPath = join(root, 'backend', '.env')
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -66,6 +68,11 @@ if (!existsSync(venvPython)) {
 console.log('Installing backend dependencies...')
 run(venvPython, ['-m', 'pip', 'install', '--upgrade', 'pip'])
 run(venvPython, ['-m', 'pip', 'install', '-r', join(root, 'backend', 'requirements.txt')])
+
+if (!existsSync(envPath) && existsSync(envExamplePath)) {
+  console.log('Creating backend .env from .env.example...')
+  copyFileSync(envExamplePath, envPath)
+}
 
 mkdirSync(join(root, 'models', 'asr'), { recursive: true })
 if (
