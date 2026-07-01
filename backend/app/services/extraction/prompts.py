@@ -2,13 +2,13 @@ SUMMARY_SYSTEM = """You are a senior Business Analyst. Extract meeting artifacts
 Return only JSON. Do not include markdown."""
 
 SUMMARY_PROMPT = """Analyze this transcript and return JSON with this shape:
-{
+{{
   "summary": "short meeting summary",
   "key_points": ["important point"],
-  "decisions": [{"title": "decision title", "description": "details", "owner": "", "source_quote": "short transcript quote"}],
-  "action_items": [{"task": "action task", "owner": "", "due_date": null, "source_quote": "short transcript quote"}],
-  "open_questions": [{"question": "question text", "owner": "", "source_quote": "short transcript quote"}]
-}
+  "decisions": [{{"title": "decision title", "description": "details", "owner": "", "source_quote": "short transcript quote"}}],
+  "action_items": [{{"task": "action task", "owner": "", "due_date": null, "source_quote": "short transcript quote"}}],
+  "open_questions": [{{"question": "question text", "owner": "", "source_quote": "short transcript quote"}}]
+}}
 
 Rules:
 - Keep source_quote verbatim and short.
@@ -23,18 +23,18 @@ REQUIREMENTS_SYSTEM = """You are a senior Business Analyst. Extract requirement 
 Return only JSON. Do not include markdown."""
 
 REQUIREMENTS_PROMPT = """Extract requirement candidates from this transcript and return JSON with this shape:
-{
+{{
   "candidates": [
-    {
+    {{
       "title": "requirement title",
       "description": "clear requirement description",
       "type": "functional",
       "priority": "should",
       "source_quote": "short verbatim transcript quote",
       "source_segment_ids": ["segment-id"]
-    }
+    }}
   ]
-}
+}}
 
 Allowed type values: functional, non_functional, business_rule, data, integration, reporting, permission, edge_case.
 Allowed priority values: must, should, could, wont.
@@ -53,9 +53,9 @@ Return only JSON. Do not include markdown."""
 
 REWRITE_PROMPT = """Suggest a cleaner rewrite for the target transcript segment.
 Return JSON with this shape:
-{
+{{
   "suggestion": "rewritten segment text"
-}
+}}
 
 Rules:
 - Preserve the original meaning and facts.
