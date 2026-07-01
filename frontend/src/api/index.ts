@@ -3,10 +3,12 @@ import type {
   ClientConfig,
   DiarizationOptions,
   Meeting,
+  MeetingArtifacts,
   ProcessingStatus,
   Project,
   Requirement,
   RequirementCandidate,
+  RewriteSuggestion,
   Speaker,
   TranscriptSegment,
 } from '../types'
@@ -36,6 +38,10 @@ export const meetingsApi = {
     api.post(`/meetings/${meetingId}/process`, options ?? {}).then(r => r.data),
   rerunDiarization: (meetingId: string, options?: DiarizationOptions) =>
     api.post(`/meetings/${meetingId}/diarization`, options ?? {}).then(r => r.data),
+  generateSummary: (meetingId: string) =>
+    api.post(`/meetings/${meetingId}/summary`).then(r => r.data),
+  artifacts: (meetingId: string) =>
+    api.get<MeetingArtifacts>(`/meetings/${meetingId}/artifacts`).then(r => r.data),
   status: (meetingId: string) => api.get<ProcessingStatus>(`/meetings/${meetingId}/status`).then(r => r.data),
 }
 
@@ -50,11 +56,17 @@ export const transcriptApi = {
     api.delete(`/transcript-segments/meeting/${meetingId}`).then(r => r.data),
   renameSpeaker: (meetingId: string, speaker_label: string, display_name: string) =>
     api.post(`/transcript-segments/meeting/${meetingId}/rename-speaker`, { speaker_label, display_name }).then(r => r.data),
+  suggestRewrite: (segmentId: string) =>
+    api.post<RewriteSuggestion>(`/transcript-segments/${segmentId}/suggest-rewrite`).then(r => r.data),
 }
 
 export const requirementsApi = {
   listCandidates: (meetingId: string) =>
     api.get<RequirementCandidate[]>(`/requirements/candidates/meeting/${meetingId}`).then(r => r.data),
+  extract: (meetingId: string) =>
+    api.post(`/requirements/meeting/${meetingId}/extract`).then(r => r.data),
+  update: (candidateId: string, data: Partial<Pick<RequirementCandidate, 'title' | 'description' | 'type' | 'priority' | 'source_quote'>>) =>
+    api.patch<RequirementCandidate>(`/requirements/candidates/${candidateId}`, data).then(r => r.data),
   approve: (candidateId: string, data: { actor?: string; business_value?: string; acceptance_criteria?: string }) =>
     api.post<Requirement>(`/requirements/candidates/${candidateId}/approve`, data).then(r => r.data),
   reject: (candidateId: string, reason: string) =>

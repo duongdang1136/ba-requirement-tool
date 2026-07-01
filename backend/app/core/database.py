@@ -26,6 +26,7 @@ def init_db():
     from app.models import project, meeting, transcript, requirement  # noqa
     Base.metadata.create_all(bind=engine)
     _ensure_processing_job_columns()
+    _ensure_requirement_candidate_columns()
 
 
 def _ensure_processing_job_columns():
@@ -41,3 +42,18 @@ def _ensure_processing_job_columns():
         for name, definition in columns.items():
             if name not in existing:
                 conn.execute(text(f"ALTER TABLE processing_jobs ADD COLUMN {name} {definition}"))
+
+
+def _ensure_requirement_candidate_columns():
+    inspector = inspect(engine)
+    if "requirement_candidates" not in inspector.get_table_names():
+        return
+
+    existing = {column["name"] for column in inspector.get_columns("requirement_candidates")}
+    columns = {
+        "rejection_reason": "TEXT",
+    }
+    with engine.begin() as conn:
+        for name, definition in columns.items():
+            if name not in existing:
+                conn.execute(text(f"ALTER TABLE requirement_candidates ADD COLUMN {name} {definition}"))

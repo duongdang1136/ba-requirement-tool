@@ -1,8 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  // Docker: nginx proxies /api/ → backend
-  // Dev: vite proxy /api → localhost:8099
+  // Vite proxies /api to the FastAPI backend on localhost:8099.
   baseURL: '/api',
 })
 

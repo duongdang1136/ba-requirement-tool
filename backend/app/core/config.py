@@ -17,10 +17,16 @@ class Settings(BaseSettings):
     cors_origins: List[str] = ["http://localhost:5173", "http://localhost:3000"]
 
     # LLM config (set one)
-    llm_provider: str = "openai"  # openai | anthropic | local
+    llm_provider: str = "ollama"  # ollama | openai | anthropic | local
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     local_llm_url: str = "http://localhost:11434"
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "qwen2.5:7b"
+    ollama_fallback_model: str = "qwen2.5:3b"
+    ollama_timeout_seconds: int = 300
+    ollama_context_tokens: int = 8192
+    llm_temperature: float = 0.2
 
     # sherpa-onnx model
     asr_model_dir: str = str(REPO_ROOT / "models" / "asr" / "sherpa-onnx-whisper-small")

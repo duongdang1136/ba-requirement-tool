@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.core.database import get_db
+from app.models.meeting import Meeting, ProcessingJob
 from app.models.requirement import RequirementCandidate, Requirement
 
 router = APIRouter()
@@ -18,6 +19,7 @@ class CandidateOut(BaseModel):
     type: str
     priority: str
     source_quote: str
+    source_segment_ids: str
     review_state: str
     created_at: datetime
 
@@ -71,6 +73,24 @@ def list_candidates(meeting_id: str, db: Session = Depends(get_db)):
         .order_by(RequirementCandidate.created_at)
         .all()
     )
+
+
+@router.post("/meeting/{meeting_id}/extract")
+def enqueue_extract_requirements(meeting_id: str, db: Session = Depends(get_db)):
+    meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    job = ProcessingJob(
+        meeting_id=meeting_id,
+        step="extract_requirements",
+        status="queued",
+        job_payload="{}",
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    return {"job_id": job.id, "status": "queued"}
 
 
 @router.patch("/candidates/{candidate_id}", response_model=CandidateOut)

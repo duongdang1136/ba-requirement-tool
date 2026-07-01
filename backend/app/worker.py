@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.core.database import SessionLocal, init_db
 from app.models.meeting import ProcessingJob
 from app.services.audio.pipeline import _utcnow, rerun_diarization, run_pipeline
+from app.services.extraction.ollama_service import extract_requirement_candidates, generate_meeting_summary
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -71,6 +72,10 @@ def run_job(job: ProcessingJob):
         run_pipeline(job.meeting_id, job.id, num_speakers, threshold)
     elif job.step == "diarize":
         rerun_diarization(job.meeting_id, job.id, num_speakers, threshold)
+    elif job.step == "summary":
+        run_summary_job(job.meeting_id, job.id)
+    elif job.step == "extract_requirements":
+        run_requirement_extraction_job(job.meeting_id, job.id)
     else:
         db = SessionLocal()
         try:
@@ -82,6 +87,51 @@ def run_job(job: ProcessingJob):
                 db.commit()
         finally:
             db.close()
+
+
+def _run_llm_job(job_id: str, step: str, work):
+    db = SessionLocal()
+    try:
+        stored = db.query(ProcessingJob).filter(ProcessingJob.id == job_id).first()
+        if not stored:
+            return
+        stored.status = "running"
+        stored.step = step
+        stored.started_at = stored.started_at or _utcnow()
+        stored.progress = 20
+        db.commit()
+
+        work(db)
+
+        stored.status = "completed"
+        stored.progress = 100
+        stored.finished_at = _utcnow()
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        stored = db.query(ProcessingJob).filter(ProcessingJob.id == job_id).first()
+        if stored:
+            stored.status = "failed"
+            stored.error = str(exc)
+            stored.finished_at = _utcnow()
+            db.commit()
+        logger.exception("LLM job failed job_id=%s step=%s", job_id, step)
+    finally:
+        db.close()
+
+
+def run_summary_job(meeting_id: str, job_id: str):
+    def work(db):
+        generate_meeting_summary(db, meeting_id)
+
+    _run_llm_job(job_id, "summary", work)
+
+
+def run_requirement_extraction_job(meeting_id: str, job_id: str):
+    def work(db):
+        extract_requirement_candidates(db, meeting_id)
+
+    _run_llm_job(job_id, "extract_requirements", work)
 
 
 def run_worker():

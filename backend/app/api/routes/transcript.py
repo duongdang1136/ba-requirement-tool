@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from app.core.database import get_db
 from app.models.meeting import Meeting
 from app.models.transcript import TranscriptSegment, Speaker
+from app.services.extraction.ollama_service import suggest_segment_rewrite
 
 router = APIRouter()
 
@@ -40,6 +41,12 @@ class SpeakerRename(BaseModel):
 class SpeakerOut(BaseModel):
     speaker_label: str
     display_name: str
+
+
+class RewriteSuggestionOut(BaseModel):
+    segment_id: str
+    original: str
+    suggestion: str
 
 
 @router.get("/meeting/{meeting_id}", response_model=List[SegmentOut])
@@ -110,6 +117,14 @@ def update_segment(segment_id: str, payload: SegmentUpdate, db: Session = Depend
     db.commit()
     db.refresh(segment)
     return segment
+
+
+@router.post("/{segment_id}/suggest-rewrite", response_model=RewriteSuggestionOut)
+def suggest_rewrite(segment_id: str, db: Session = Depends(get_db)):
+    try:
+        return suggest_segment_rewrite(db, segment_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/meeting/{meeting_id}/rename-speaker")

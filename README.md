@@ -104,6 +104,14 @@ http://localhost:5173
 The frontend runs on port `5173`. The backend runs on port `8099`.
 `npm run dev` also starts a background worker process. The API enqueues processing jobs, and the worker runs audio processing outside the web server process.
 
+For local AI features, install Ollama and pull the default model:
+
+```bash
+ollama pull qwen2.5:7b
+```
+
+Use `qwen2.5:3b` on smaller machines by setting `OLLAMA_MODEL=qwen2.5:3b`.
+
 Local runtime data is stored in:
 
 - `backend/ba_tool.db`
@@ -111,20 +119,6 @@ Local runtime data is stored in:
 - `models/`
 
 These are ignored by git and should not be committed.
-
-## Optional Docker Usage
-
-Docker is still supported if you prefer a containerized setup:
-
-```bash
-git clone https://github.com/duongdang1136/ba-requirement-tool.git
-cd ba-requirement-tool
-docker compose up --build
-```
-
-Then open → **http://localhost:5173**
-
-Docker stores SQLite, uploads, and ASR models in Docker volumes. Stop with `Ctrl+C`, or use `docker compose down` if running in detached mode.
 
 ## For Developers
 
@@ -227,7 +221,13 @@ cp backend/.env.example backend/.env
 | `MAX_UPLOAD_SIZE_MB` | `1024` | File size limit |
 | `WORKER_POLL_INTERVAL_SECONDS` | `2.0` | Delay between queue polls |
 | `JOB_TIMEOUT_MINUTES` | `240` | Mark running jobs failed after this many minutes |
-| `LLM_PROVIDER` | `openai` | For Phase 2 extraction |
+| `LLM_PROVIDER` | `ollama` | Local AI provider for summary, rewrite, and extraction |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
+| `OLLAMA_MODEL` | `qwen2.5:7b` | Primary local model |
+| `OLLAMA_FALLBACK_MODEL` | `qwen2.5:3b` | Fallback model if primary fails |
+| `OLLAMA_TIMEOUT_SECONDS` | `300` | LLM request timeout |
+| `OLLAMA_CONTEXT_TOKENS` | `8192` | Ollama context window |
+| `LLM_TEMPERATURE` | `0.2` | Lower values keep extraction more stable |
 | `OPENAI_API_KEY` | `` | OpenAI key (Phase 2) |
 
 ### Project structure
@@ -240,19 +240,15 @@ ba-requirement-tool/
 │   │   ├── core/         # config, database
 │   │   ├── models/       # SQLAlchemy models
 │   │   └── services/     # audio pipeline, extraction, export
-│   └── Dockerfile
 ├── frontend/             # React + TypeScript + Vite
 │   ├── src/
 │   │   ├── pages/        # App, UploadPage
 │   │   ├── components/   # TranscriptReview
 │   │   ├── api/          # API client
 │   │   └── types/
-│   ├── nginx.conf
-│   └── Dockerfile
 ├── features/final-docs/  # BA specification docs
 │   ├── Core/
 │   └── Project-Management/
-├── docker-compose.yml
 └── README.md
 ```
 
@@ -278,11 +274,11 @@ ba-requirement-tool/
 | | |
 |---|---|
 | Backend | FastAPI (Python) |
-| Database | SQLite in Docker volume |
+| Database | SQLite local file |
 | Speech | sherpa-onnx (offline) |
 | Audio | ffmpeg |
 | Frontend | React + TypeScript + Vite |
-| Serve | nginx (Docker) |
+| Serve | Vite dev server + FastAPI |
 
 ## License
 

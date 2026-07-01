@@ -5,13 +5,14 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.meeting import MediaFile, Meeting, ProcessingJob
 from app.models.project import Project
+from app.models.requirement import ActionItem, Decision, MeetingSummary, OpenQuestion
 
 router = APIRouter()
 
@@ -46,6 +47,66 @@ class ProcessingStatusOut(BaseModel):
     error: Optional[str]
     started_at: Optional[datetime]
     finished_at: Optional[datetime]
+
+
+class MeetingSummaryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    id: str
+    meeting_id: str
+    summary: str
+    key_points: str
+    model_name: str
+    created_at: datetime
+    updated_at: datetime
+
+class DecisionOut(BaseModel):
+    id: str
+    project_id: str
+    meeting_id: Optional[str]
+    title: str
+    description: str
+    owner: str
+    source_quote: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ActionItemOut(BaseModel):
+    id: str
+    project_id: str
+    meeting_id: Optional[str]
+    task: str
+    owner: str
+    status: str
+    source_quote: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class OpenQuestionOut(BaseModel):
+    id: str
+    project_id: str
+    meeting_id: Optional[str]
+    question: str
+    owner: str
+    status: str
+    source_quote: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MeetingArtifactsOut(BaseModel):
+    summary: Optional[MeetingSummaryOut]
+    decisions: List[DecisionOut]
+    action_items: List[ActionItemOut]
+    open_questions: List[OpenQuestionOut]
 
 
 class DiarizationOptions(BaseModel):
@@ -175,6 +236,62 @@ def enqueue_diarization(
     db.commit()
     db.refresh(job)
     return {"job_id": job.id, "status": "queued"}
+
+
+@router.post("/{meeting_id}/summary")
+def enqueue_meeting_summary(meeting_id: str, db: Session = Depends(get_db)):
+    meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    job = ProcessingJob(
+        meeting_id=meeting_id,
+        step="summary",
+        status="queued",
+        job_payload="{}",
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    return {"job_id": job.id, "status": "queued"}
+
+
+@router.get("/{meeting_id}/artifacts", response_model=MeetingArtifactsOut)
+def get_meeting_artifacts(meeting_id: str, db: Session = Depends(get_db)):
+    meeting = db.query(Meeting).filter(Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    summary = (
+        db.query(MeetingSummary)
+        .filter(MeetingSummary.meeting_id == meeting_id)
+        .order_by(MeetingSummary.created_at.desc())
+        .first()
+    )
+    decisions = (
+        db.query(Decision)
+        .filter(Decision.meeting_id == meeting_id)
+        .order_by(Decision.created_at)
+        .all()
+    )
+    action_items = (
+        db.query(ActionItem)
+        .filter(ActionItem.meeting_id == meeting_id)
+        .order_by(ActionItem.created_at)
+        .all()
+    )
+    open_questions = (
+        db.query(OpenQuestion)
+        .filter(OpenQuestion.meeting_id == meeting_id)
+        .order_by(OpenQuestion.created_at)
+        .all()
+    )
+    return MeetingArtifactsOut(
+        summary=summary,
+        decisions=decisions,
+        action_items=action_items,
+        open_questions=open_questions,
+    )
 
 
 @router.get("/{meeting_id}/status", response_model=ProcessingStatusOut)

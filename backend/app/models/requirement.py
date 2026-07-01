@@ -48,6 +48,19 @@ class Requirement(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
+class MeetingSummary(Base):
+    __tablename__ = "meeting_summaries"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    meeting_id: Mapped[str] = mapped_column(String, ForeignKey("meetings.id"), nullable=False)
+    summary: Mapped[str] = mapped_column(Text, default="")
+    key_points: Mapped[str] = mapped_column(Text, default="[]")  # JSON list
+    model_name: Mapped[str] = mapped_column(String(255), default="")
+    prompt_version: Mapped[str] = mapped_column(String(50), default="p3-summary-v1")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
 class OpenQuestion(Base):
     __tablename__ = "open_questions"
 

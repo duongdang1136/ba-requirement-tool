@@ -48,6 +48,62 @@ export interface Speaker {
   display_name: string
 }
 
+export interface MeetingSummary {
+  id: string
+  meeting_id: string
+  summary: string
+  key_points: string
+  model_name: string
+  created_at: string
+  updated_at: string
+}
+
+export interface RewriteSuggestion {
+  segment_id: string
+  original: string
+  suggestion: string
+}
+
+export interface Decision {
+  id: string
+  project_id: string
+  meeting_id: string | null
+  title: string
+  description: string
+  owner: string
+  source_quote: string
+  created_at: string
+}
+
+export interface ActionItem {
+  id: string
+  project_id: string
+  meeting_id: string | null
+  task: string
+  owner: string
+  status: string
+  source_quote: string
+  created_at: string
+}
+
+export interface OpenQuestion {
+  id: string
+  project_id: string
+  meeting_id: string | null
+  question: string
+  owner: string
+  status: string
+  source_quote: string
+  created_at: string
+}
+
+export interface MeetingArtifacts {
+  summary: MeetingSummary | null
+  decisions: Decision[]
+  action_items: ActionItem[]
+  open_questions: OpenQuestion[]
+}
+
 export interface ClientConfig {
   max_upload_size_mb: number
   allowed_extensions: string[]
@@ -66,6 +122,7 @@ export interface RequirementCandidate {
   type: RequirementType
   priority: RequirementPriority
   source_quote: string
+  source_segment_ids: string
   review_state: 'pending' | 'approved' | 'rejected'
   created_at: string
 }
