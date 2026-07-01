@@ -246,9 +246,6 @@ ba-requirement-tool/
 │   │   ├── components/   # TranscriptReview
 │   │   ├── api/          # API client
 │   │   └── types/
-├── features/final-docs/  # BA specification docs
-│   ├── Core/
-│   └── Project-Management/
 └── README.md
 ```
 
