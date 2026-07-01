@@ -1,6 +1,7 @@
 import api from './client'
 import type {
   ClientConfig,
+  ChunkUploadStatus,
   DiarizationOptions,
   Meeting,
   MeetingArtifacts,
@@ -34,6 +35,36 @@ export const meetingsApi = {
     form.append('file', file)
     return api.post(`/meetings/${meetingId}/media`, form).then(r => r.data)
   },
+  chunkStatus: (meetingId: string, uploadId: string, fileName: string, totalChunks: number) =>
+    api.get<ChunkUploadStatus>(`/meetings/${meetingId}/media/chunks/${uploadId}`, {
+      params: { file_name: fileName, total_chunks: totalChunks },
+    }).then(r => r.data),
+  uploadChunk: (
+    meetingId: string,
+    data: { uploadId: string; fileName: string; chunkIndex: number; totalChunks: number; fileSize: number; chunk: Blob },
+  ) => {
+    const form = new FormData()
+    form.append('upload_id', data.uploadId)
+    form.append('file_name', data.fileName)
+    form.append('chunk_index', String(data.chunkIndex))
+    form.append('total_chunks', String(data.totalChunks))
+    form.append('file_size', String(data.fileSize))
+    form.append('chunk', data.chunk)
+    return api.post<ChunkUploadStatus>(`/meetings/${meetingId}/media/chunks`, form).then(r => r.data)
+  },
+  completeChunkUpload: (
+    meetingId: string,
+    uploadId: string,
+    data: { fileName: string; totalChunks: number; fileSize: number; mimeType: string },
+  ) =>
+    api.post(`/meetings/${meetingId}/media/chunks/${uploadId}/complete`, null, {
+      params: {
+        file_name: data.fileName,
+        total_chunks: data.totalChunks,
+        file_size: data.fileSize,
+        mime_type: data.mimeType,
+      },
+    }).then(r => r.data),
   process: (meetingId: string, options?: DiarizationOptions) =>
     api.post(`/meetings/${meetingId}/process`, options ?? {}).then(r => r.data),
   rerunDiarization: (meetingId: string, options?: DiarizationOptions) =>

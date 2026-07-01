@@ -107,6 +107,15 @@ export interface MeetingArtifacts {
 export interface ClientConfig {
   max_upload_size_mb: number
   allowed_extensions: string[]
+  upload_chunk_size_mb: number
+}
+
+export interface ChunkUploadStatus {
+  meeting_id: string
+  file_name: string
+  total_chunks: number
+  received_chunks: number[]
+  complete: boolean
 }
 
 export interface DiarizationOptions {

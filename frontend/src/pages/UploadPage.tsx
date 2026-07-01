@@ -11,6 +11,7 @@ export default function UploadPage({ projectId, onMeetingCreated }: Props) {
   const fallbackConfig: ClientConfig = {
     allowed_extensions: ['.mp3', '.wav', '.m4a', '.mp4', '.webm', '.ogg'],
     max_upload_size_mb: 1024,
+    upload_chunk_size_mb: 8,
   }
   const [title, setTitle] = useState('')
   const [file, setFile] = useState<File | null>(null)
@@ -55,8 +56,7 @@ export default function UploadPage({ projectId, onMeetingCreated }: Props) {
 
     try {
       const meeting = await meetingsApi.create({ project_id: projectId, title })
-      setProgress('Uploading file...')
-      await meetingsApi.uploadMedia(meeting.id, file)
+      await uploadMeetingFile(meeting.id, file)
       setProgress('Starting processing...')
       await meetingsApi.process(meeting.id, {
         diarization_num_speakers: speakerCount ? Number(speakerCount) : undefined,
@@ -68,6 +68,50 @@ export default function UploadPage({ projectId, onMeetingCreated }: Props) {
       setError(err.response?.data?.detail || 'Upload failed')
       setStep('form')
     }
+  }
+
+  function uploadIdFor(meetingId: string, selectedFile: File) {
+    const raw = `${meetingId}-${selectedFile.name}-${selectedFile.size}-${selectedFile.lastModified}`
+    return btoa(unescape(encodeURIComponent(raw))).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80)
+  }
+
+  async function uploadMeetingFile(meetingId: string, selectedFile: File) {
+    const chunkSize = Math.max(1, config.upload_chunk_size_mb) * 1024 * 1024
+    if (selectedFile.size <= chunkSize) {
+      setProgress('Uploading file...')
+      await meetingsApi.uploadMedia(meetingId, selectedFile)
+      return
+    }
+
+    const totalChunks = Math.ceil(selectedFile.size / chunkSize)
+    const uploadId = uploadIdFor(meetingId, selectedFile)
+    const status = await meetingsApi.chunkStatus(meetingId, uploadId, selectedFile.name, totalChunks)
+    const uploaded = new Set(status.received_chunks)
+
+    for (let i = 0; i < totalChunks; i += 1) {
+      if (uploaded.has(i)) {
+        continue
+      }
+      const start = i * chunkSize
+      const end = Math.min(selectedFile.size, start + chunkSize)
+      setProgress(`Uploading chunk ${i + 1}/${totalChunks}...`)
+      await meetingsApi.uploadChunk(meetingId, {
+        uploadId,
+        fileName: selectedFile.name,
+        chunkIndex: i,
+        totalChunks,
+        fileSize: selectedFile.size,
+        chunk: selectedFile.slice(start, end),
+      })
+    }
+
+    setProgress('Finalizing upload...')
+    await meetingsApi.completeChunkUpload(meetingId, uploadId, {
+      fileName: selectedFile.name,
+      totalChunks,
+      fileSize: selectedFile.size,
+      mimeType: selectedFile.type,
+    })
   }
 
   return (

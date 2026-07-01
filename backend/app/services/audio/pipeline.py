@@ -38,6 +38,12 @@ class SpeakerTurn(TypedDict):
     speaker: str
 
 
+class SpeakerCentroid(TypedDict):
+    speaker: str
+    embedding: object
+    count: int
+
+
 def run_pipeline(
     meeting_id: str,
     job_id: str,
@@ -415,6 +421,7 @@ def _run_whisper_asr(audio_path: Path, speech_intervals: list[SpeechInterval]) -
             decoding_method="greedy_search",
             language=settings.asr_language,
             task="transcribe",
+            provider=settings.asr_provider,
         )
 
         samples, sample_rate = sf.read(str(audio_path), dtype="float32", always_2d=False)
@@ -493,6 +500,8 @@ def _run_diarization(
             return None
 
         diarizer = sherpa_onnx.OfflineSpeakerDiarization(config)
+        embedding_extractor = _create_speaker_embedding_extractor(sherpa_onnx, embedding_model)
+        speaker_centroids: list[SpeakerCentroid] = []
         chunk_seconds = max(60, settings.diarization_chunk_minutes * 60)
         turns: list[SpeakerTurn] = []
 
@@ -513,11 +522,22 @@ def _run_diarization(
                 samples = np.ascontiguousarray(data[:, 0])
                 chunk_offset = start_frame / sample_rate
                 result = diarizer.process(samples).sort_by_start_time()
+                local_speakers = _match_chunk_speakers(
+                    np,
+                    embedding_extractor,
+                    sample_rate,
+                    samples,
+                    result,
+                    speaker_centroids,
+                )
                 turns.extend(
                     {
                         "start": round(chunk_offset + float(turn.start), 2),
                         "end": round(chunk_offset + float(turn.end), 2),
-                        "speaker": f"SPEAKER_{int(turn.speaker):02d}",
+                        "speaker": local_speakers.get(
+                            int(turn.speaker),
+                            f"SPEAKER_{int(turn.speaker):02d}",
+                        ),
                     }
                     for turn in result
                 )
@@ -531,6 +551,89 @@ def _run_diarization(
     except Exception as exc:
         logger.exception("Diarization failed: %s", exc)
         return None
+
+
+def _create_speaker_embedding_extractor(sherpa_onnx, embedding_model: Path):
+    try:
+        config = sherpa_onnx.SpeakerEmbeddingExtractorConfig(
+            model=str(embedding_model),
+            num_threads=max(1, settings.asr_num_threads),
+            provider="cpu",
+        )
+        if not config.validate():
+            logger.warning("Speaker embedding extractor config is invalid; global speaker matching is disabled")
+            return None
+        return sherpa_onnx.SpeakerEmbeddingExtractor(config)
+    except Exception:
+        logger.exception("Failed to initialize speaker embedding extractor; global speaker matching is disabled")
+        return None
+
+
+def _match_chunk_speakers(
+    np,
+    embedding_extractor,
+    sample_rate: int,
+    samples,
+    diarization_turns,
+    speaker_centroids: list[SpeakerCentroid],
+) -> dict[int, str]:
+    if embedding_extractor is None:
+        return {}
+
+    local_samples: dict[int, list] = {}
+    for turn in diarization_turns:
+        local_id = int(turn.speaker)
+        start = max(0, int(float(turn.start) * sample_rate))
+        end = min(len(samples), int(float(turn.end) * sample_rate))
+        if end <= start:
+            continue
+        local_samples.setdefault(local_id, []).append(samples[start:end])
+
+    local_to_global: dict[int, str] = {}
+    for local_id, pieces in local_samples.items():
+        speaker_audio = np.ascontiguousarray(np.concatenate(pieces))
+        embedding = _compute_speaker_embedding(np, embedding_extractor, sample_rate, speaker_audio)
+        if embedding is None:
+            continue
+        local_to_global[local_id] = _match_or_create_speaker(np, embedding, speaker_centroids)
+    return local_to_global
+
+
+def _compute_speaker_embedding(np, embedding_extractor, sample_rate: int, samples):
+    if len(samples) < sample_rate:
+        return None
+    stream = embedding_extractor.create_stream()
+    stream.accept_waveform(sample_rate, samples)
+    if not embedding_extractor.is_ready(stream):
+        return None
+    embedding = np.asarray(embedding_extractor.compute(stream), dtype="float32")
+    norm = np.linalg.norm(embedding)
+    if norm <= 0:
+        return None
+    return embedding / norm
+
+
+def _match_or_create_speaker(np, embedding, speaker_centroids: list[SpeakerCentroid]) -> str:
+    best_index = -1
+    best_score = -1.0
+    for index, centroid in enumerate(speaker_centroids):
+        score = float(np.dot(embedding, centroid["embedding"]))
+        if score > best_score:
+            best_score = score
+            best_index = index
+
+    if best_index >= 0 and best_score >= settings.diarization_speaker_match_threshold:
+        centroid = speaker_centroids[best_index]
+        count = centroid["count"]
+        updated = ((centroid["embedding"] * count) + embedding) / (count + 1)
+        norm = np.linalg.norm(updated)
+        centroid["embedding"] = updated / norm if norm > 0 else updated
+        centroid["count"] = count + 1
+        return centroid["speaker"]
+
+    speaker = f"SPEAKER_{len(speaker_centroids):02d}"
+    speaker_centroids.append({"speaker": speaker, "embedding": embedding, "count": 1})
+    return speaker
 
 
 def _assign_speaker(start: float, end: float, speaker_turns: list[SpeakerTurn]) -> str:

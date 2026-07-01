@@ -213,12 +213,15 @@ cp backend/.env.example backend/.env
 | `ASR_MODEL_DIR` | `../models/asr/sherpa-onnx-whisper-small` | sherpa-onnx model path |
 | `ASR_LANGUAGE` | `vi` | Primary meeting language |
 | `ASR_NUM_THREADS` | `8` | CPU threads used by ASR |
+| `ASR_PROVIDER` | `cpu` | sherpa-onnx execution provider. Use `coreml` on supported macOS devices |
 | `VAD_MODEL_PATH` | `../models/vad/silero_vad.onnx` | Silero VAD model |
 | `DIARIZATION_SEGMENTATION_MODEL` | `../models/diarization/sherpa-onnx-pyannote-segmentation-3-0/model.onnx` | Speaker segmentation model |
 | `DIARIZATION_EMBEDDING_MODEL` | `../models/diarization/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx` | Speaker embedding model |
 | `DIARIZATION_CLUSTER_THRESHOLD` | `0.5` | Speaker clustering threshold |
 | `DIARIZATION_CHUNK_MINUTES` | `25` | Minutes per diarization chunk |
+| `DIARIZATION_SPEAKER_MATCH_THRESHOLD` | `0.62` | Cross-chunk speaker embedding match threshold |
 | `MAX_UPLOAD_SIZE_MB` | `1024` | File size limit |
+| `UPLOAD_CHUNK_SIZE_MB` | `8` | Browser upload chunk size for resumable uploads |
 | `WORKER_POLL_INTERVAL_SECONDS` | `2.0` | Delay between queue polls |
 | `JOB_TIMEOUT_MINUTES` | `240` | Mark running jobs failed after this many minutes |
 | `LLM_PROVIDER` | `ollama` | Local AI provider for summary, rewrite, and extraction |
