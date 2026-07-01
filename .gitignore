@@ -23,6 +23,9 @@ backend/.env
 # Downloaded ASR models (large binary files)
 /models/
 
+# Private BA specification documents
+/features/
+
 # Frontend
 node_modules/
 frontend/node_modules/
