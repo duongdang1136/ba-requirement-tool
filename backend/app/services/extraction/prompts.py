@@ -1,5 +1,6 @@
 SUMMARY_SYSTEM = """You are a senior Business Analyst. Extract meeting artifacts from a transcript.
-Return only JSON. Do not include markdown."""
+Return only JSON. Do not include markdown.
+Always write every generated field in Vietnamese."""
 
 SUMMARY_PROMPT = """Analyze this transcript and return JSON with this shape:
 {{
@@ -11,6 +12,8 @@ SUMMARY_PROMPT = """Analyze this transcript and return JSON with this shape:
 }}
 
 Rules:
+- Write summary, key_points, decisions, action_items, and open_questions in Vietnamese.
+- Keep names, product terms, and technical terms unchanged when translating would reduce clarity.
 - Keep source_quote verbatim and short.
 - If no items exist, return an empty array.
 - Use null for unknown due_date.
@@ -20,7 +23,8 @@ Transcript:
 """
 
 REQUIREMENTS_SYSTEM = """You are a senior Business Analyst. Extract requirement candidates from a transcript.
-Return only JSON. Do not include markdown."""
+Return only JSON. Do not include markdown.
+Always write every generated field in Vietnamese."""
 
 REQUIREMENTS_PROMPT = """Extract requirement candidates from this transcript and return JSON with this shape:
 {{
@@ -39,6 +43,8 @@ REQUIREMENTS_PROMPT = """Extract requirement candidates from this transcript and
 Allowed type values: functional, non_functional, business_rule, data, integration, reporting, permission, edge_case.
 Allowed priority values: must, should, could, wont.
 Rules:
+- Write title and description in Vietnamese.
+- Keep names, product terms, and technical terms unchanged when translating would reduce clarity.
 - Only extract requirements supported by transcript evidence.
 - Keep source_quote verbatim and short.
 - Use source_segment_ids from the transcript lines.
